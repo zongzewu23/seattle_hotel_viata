@@ -1,0 +1,553 @@
+---
+description: Debugging and troubleshooting standards for Seattle Hotel Explorer
+globs: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"]
+alwaysApply: false
+---
+
+# Debugging and Troubleshooting Standards
+
+You are an expert debugger and problem solver. When issues arise in the Seattle Hotel Explorer project, follow systematic approaches to identify, isolate, and resolve problems efficiently.
+
+## 🔍 Debugging Philosophy
+
+### Systematic Approach
+- **Reproduce the issue** consistently before attempting fixes
+- **Isolate the problem** to the smallest possible scope
+- **Gather context** about environment, user actions, and data state
+- **Use logging** strategically to trace execution flow
+- **Test one fix at a time** to avoid introducing new issues
+
+### Evidence-Based Debugging
+- **Collect metrics** and logs before making assumptions
+- **Use browser dev tools** effectively for investigation
+- **Implement proper error boundaries** for React components
+- **Log performance metrics** to identify bottlenecks
+- **Document findings** for future reference
+
+## 🛠 Debugging Tools Setup
+
+### Development Environment
+- Use **React DevTools** for component analysis
+- Install **Redux DevTools** for state management debugging
+- Use **React Query DevTools** for API state debugging
+- Configure **source maps** for production debugging
+
+```typescript
+// ✅ Good Development Setup
+export function setupDevelopmentTools() {
+  if (process.env.NODE_ENV === 'development') {
+    // Enable React DevTools
+    if (typeof window !== 'undefined' && (window as any).__REACT_DEVTOOLS_GLOBAL_HOOK__) {
+      console.log('React DevTools detected');
+    }
+
+    // Enable performance monitoring
+    if ('performance' in window) {
+      const observer = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          console.log(`${entry.name}: ${entry.duration}ms`);
+        }
+      });
+      observer.observe({ entryTypes: ['measure'] });
+    }
+
+    // Enable debug logging
+    localStorage.setItem('debug', 'seattle-hotel-explorer:*');
+  }
+}
+
+// Debug logger with levels
+export enum LogLevel {
+  DEBUG = 0,
+  INFO = 1,
+  WARN = 2,
+  ERROR = 3,
+}
+
+export class DebugLogger {
+  private static instance: DebugLogger;
+  private logLevel: LogLevel = LogLevel.INFO;
+
+  static getInstance(): DebugLogger {
+    if (!DebugLogger.instance) {
+      DebugLogger.instance = new DebugLogger();
+    }
+    return DebugLogger.instance;
+  }
+
+  setLogLevel(level: LogLevel) {
+    this.logLevel = level;
+  }
+
+  debug(message: string, ...args: any[]) {
+    if (this.logLevel <= LogLevel.DEBUG) {
+      console.log(`[DEBUG] ${message}`, ...args);
+    }
+  }
+
+  info(message: string, ...args: any[]) {
+    if (this.logLevel <= LogLevel.INFO) {
+      console.info(`[INFO] ${message}`, ...args);
+    }
+  }
+
+  warn(message: string, ...args: any[]) {
+    if (this.logLevel <= LogLevel.WARN) {
+      console.warn(`[WARN] ${message}`, ...args);
+    }
+  }
+
+  error(message: string, error?: Error, ...args: any[]) {
+    if (this.logLevel <= LogLevel.ERROR) {
+      console.error(`[ERROR] ${message}`, error, ...args);
+    }
+  }
+}
+```
+
+## 🚨 Error Handling & Monitoring
+
+### React Error Boundaries
+- Implement **comprehensive error boundaries** for different app sections
+- Use **error reporting** services for production monitoring
+- Provide **user-friendly error messages** with recovery options
+- Log **detailed error context** for debugging
+
+```typescript
+// ✅ Good Error Boundary Implementation
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+  errorInfo?: ErrorInfo;
+}
+
+export class HotelExplorerErrorBoundary extends Component<
+  React.PropsWithChildren<{}>,
+  ErrorBoundaryState
+> {
+  private logger = DebugLogger.getInstance();
+
+  constructor(props: React.PropsWithChildren<{}>) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return {
+      hasError: true,
+      error,
+    };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    this.logger.error('Error Boundary caught an error', error, errorInfo);
+    
+    // Report to error monitoring service
+    this.reportError(error, errorInfo);
+    
+    this.setState({
+      error,
+      errorInfo,
+    });
+  }
+
+  private reportError(error: Error, errorInfo: ErrorInfo) {
+    // Report to monitoring service (e.g., Sentry)
+    if (process.env.NODE_ENV === 'production') {
+      // Sentry.captureException(error, {
+      //   contexts: { react: errorInfo }
+      // });
+    }
+  }
+
+  private handleRetry = () => {
+    this.setState({ hasError: false, error: undefined, errorInfo: undefined });
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="error-boundary">
+          <h2>Something went wrong</h2>
+          <details>
+            <summary>Error Details</summary>
+            <pre>{this.state.error?.message}</pre>
+            <pre>{this.state.error?.stack}</pre>
+          </details>
+          <button onClick={this.handleRetry}>Try Again</button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// Specialized error boundaries for different sections
+export function MapErrorBoundary({ children }: { children: React.ReactNode }) {
+  return (
+    <ErrorBoundary
+      fallback={<MapErrorFallback />}
+      onError={(error, errorInfo) => {
+        DebugLogger.getInstance().error('Map error occurred', error, errorInfo);
+      }}
+    >
+      {children}
+    </ErrorBoundary>
+  );
+}
+
+function MapErrorFallback() {
+  return (
+    <div className="map-error-fallback">
+      <h3>Map failed to load</h3>
+      <p>Please check your internet connection and try again.</p>
+      <button onClick={() => window.location.reload()}>
+        Reload Page
+      </button>
+    </div>
+  );
+}
+```
+
+### Global Error Handling
+- Catch **unhandled promise rejections**
+- Handle **network errors** gracefully
+- Implement **retry logic** for transient failures
+- Log **performance issues** and slow operations
+
+```typescript
+// ✅ Good Global Error Handling
+export function setupGlobalErrorHandling() {
+  // Handle unhandled promise rejections
+  window.addEventListener('unhandledrejection', (event) => {
+    DebugLogger.getInstance().error(
+      'Unhandled promise rejection',
+      event.reason
+    );
+    
+    // Prevent default browser behavior
+    event.preventDefault();
+    
+    // Show user-friendly error message
+    showErrorNotification('Something went wrong. Please try again.');
+  });
+
+  // Handle global JavaScript errors
+  window.addEventListener('error', (event) => {
+    DebugLogger.getInstance().error(
+      'Global error occurred',
+      event.error,
+      {
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+      }
+    );
+  });
+
+  // Handle network errors
+  window.addEventListener('online', () => {
+    DebugLogger.getInstance().info('Network connection restored');
+    showSuccessNotification('Connection restored');
+  });
+
+  window.addEventListener('offline', () => {
+    DebugLogger.getInstance().warn('Network connection lost');
+    showWarningNotification('Connection lost. Some features may not work.');
+  });
+}
+
+// Network error handling utility
+export async function fetchWithRetry<T>(
+  url: string,
+  options: RequestInit = {},
+  maxRetries: number = 3
+): Promise<T> {
+  const logger = DebugLogger.getInstance();
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      logger.debug(`Fetch attempt ${attempt} for ${url}`);
+      
+      const response = await fetch(url, {
+        ...options,
+        signal: AbortSignal.timeout(10000), // 10 second timeout
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      logger.debug(`Fetch successful for ${url}`);
+      return data;
+    } catch (error) {
+      logger.warn(`Fetch attempt ${attempt} failed for ${url}`, error);
+      
+      if (attempt === maxRetries) {
+        logger.error(`All fetch attempts failed for ${url}`, error);
+        throw error;
+      }
+      
+      // Exponential backoff
+      await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+    }
+  }
+  
+  throw new Error('Max retries exceeded');
+}
+```
+
+## 🗺 Map-Specific Debugging
+
+### Mapbox Debugging
+- Handle **map loading failures** gracefully
+- Debug **clustering issues** with detailed logging
+- Monitor **map performance** metrics
+- Validate **coordinate data** before rendering
+
+```typescript
+// ✅ Good Map Debugging
+export function useMapDebugging(mapRef: RefObject<MapRef>) {
+  const logger = DebugLogger.getInstance();
+
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+
+    // Debug map events
+    map.on('error', (e) => {
+      logger.error('Map error occurred', e.error);
+    });
+
+    map.on('load', () => {
+      logger.info('Map loaded successfully');
+    });
+
+    map.on('sourcedata', (e) => {
+      if (e.isSourceLoaded) {
+        logger.debug(`Source loaded: ${e.sourceId}`);
+      }
+    });
+
+    map.on('data', (e) => {
+      logger.debug(`Data event: ${e.dataType}`);
+    });
+
+    // Monitor map performance
+    const startTime = performance.now();
+    map.on('idle', () => {
+      const loadTime = performance.now() - startTime;
+      logger.info(`Map idle after ${loadTime}ms`);
+    });
+
+    return () => {
+      // Cleanup event listeners
+      map.off('error');
+      map.off('load');
+      map.off('sourcedata');
+      map.off('data');
+      map.off('idle');
+    };
+  }, [mapRef, logger]);
+}
+
+// Clustering debug utilities
+export function debugClustering(hotels: Hotel[], clusters: HotelCluster[]) {
+  const logger = DebugLogger.getInstance();
+  
+  logger.debug('Clustering Debug Info:', {
+    totalHotels: hotels.length,
+    totalClusters: clusters.length,
+    clusteredHotels: clusters.reduce((sum, cluster) => sum + cluster.count, 0),
+    averageClusterSize: clusters.length > 0 
+      ? clusters.reduce((sum, cluster) => sum + cluster.count, 0) / clusters.length 
+      : 0,
+  });
+
+  // Validate clustering results
+  const allClusteredHotels = clusters.flatMap(cluster => cluster.hotels);
+  const uniqueHotelIds = new Set(allClusteredHotels.map(h => h.hotel_id));
+  
+  if (uniqueHotelIds.size !== allClusteredHotels.length) {
+    logger.error('Clustering error: Duplicate hotels found in clusters');
+  }
+  
+  if (uniqueHotelIds.size !== hotels.length) {
+    logger.error('Clustering error: Hotel count mismatch', {
+      original: hotels.length,
+      clustered: uniqueHotelIds.size,
+    });
+  }
+}
+
+// Coordinate validation
+export function validateCoordinates(hotels: Hotel[]): Hotel[] {
+  const logger = DebugLogger.getInstance();
+  const validHotels: Hotel[] = [];
+  const invalidHotels: Hotel[] = [];
+
+  hotels.forEach(hotel => {
+    const isValid = 
+      typeof hotel.longitude === 'number' &&
+      typeof hotel.latitude === 'number' &&
+      !isNaN(hotel.longitude) &&
+      !isNaN(hotel.latitude) &&
+      hotel.longitude >= -180 &&
+      hotel.longitude <= 180 &&
+      hotel.latitude >= -90 &&
+      hotel.latitude <= 90;
+
+    if (isValid) {
+      validHotels.push(hotel);
+    } else {
+      invalidHotels.push(hotel);
+      logger.warn(`Invalid coordinates for hotel ${hotel.hotel_id}:`, {
+        longitude: hotel.longitude,
+        latitude: hotel.latitude,
+      });
+    }
+  });
+
+  if (invalidHotels.length > 0) {
+    logger.error(`Found ${invalidHotels.length} hotels with invalid coordinates`);
+  }
+
+  return validHotels;
+}
+```
+
+## 🔄 State Debugging
+
+### Zustand State Debugging
+- Implement **state change logging** for debugging
+- Track **state mutations** and their sources
+- Debug **state synchronization** issues
+- Monitor **state performance** impacts
+
+```typescript
+// ✅ Good State Debugging
+export const useAppStore = create<AppState>()(
+  subscribeWithSelector(
+    devtools(
+      (set, get) => ({
+        hotels: [],
+        selectedHotel: null,
+        filters: initialFilters,
+        
+        setHotels: (hotels) => {
+          DebugLogger.getInstance().debug('Setting hotels', { count: hotels.length });
+          set({ hotels });
+        },
+        
+        selectHotel: (hotel) => {
+          DebugLogger.getInstance().debug('Selecting hotel', { hotelId: hotel?.hotel_id });
+          set({ selectedHotel: hotel });
+        },
+        
+        updateFilters: (newFilters) => {
+          const currentFilters = get().filters;
+          DebugLogger.getInstance().debug('Updating filters', { 
+            old: currentFilters, 
+            new: newFilters 
+          });
+          set({ filters: { ...currentFilters, ...newFilters } });
+        },
+      }),
+      {
+        name: 'hotel-explorer-store',
+        serialize: {
+          options: {
+            map: true,
+            set: true,
+          },
+        },
+      }
+    )
+  )
+);
+
+// State change logger
+export function useStateChangeLogger() {
+  const logger = DebugLogger.getInstance();
+  
+  useEffect(() => {
+    const unsubscribe = useAppStore.subscribe(
+      (state) => state,
+      (state, prevState) => {
+        logger.debug('State changed:', {
+          prev: prevState,
+          current: state,
+          diff: findStateDifferences(prevState, state),
+        });
+      }
+    );
+    
+    return unsubscribe;
+  }, [logger]);
+}
+
+function findStateDifferences(prev: any, current: any): any {
+  const diff: any = {};
+  
+  Object.keys(current).forEach(key => {
+    if (prev[key] !== current[key]) {
+      diff[key] = {
+        from: prev[key],
+        to: current[key],
+      };
+    }
+  });
+  
+  return diff;
+}
+```
+
+## 🎯 Performance Debugging
+
+### Performance Profiling
+- Use **React DevTools Profiler** for component performance
+- Monitor **render cycles** and expensive operations
+- Track **memory usage** and potential leaks
+- Identify **performance bottlenecks** in data processing
+
+```typescript
+// ✅ Good Performance Debugging
+export function usePerformanceDebugger() {
+  const logger = DebugLogger.getInstance();
+  const [profileData, setProfileData] = useState<any>(null);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      // Monitor component render times
+      const startTime = performance.now();
+      
+      return () => {
+        const endTime = performance.now();
+        const renderTime = endTime - startTime;
+        
+        if (renderTime > 100) { // Log slow renders
+          logger.warn(`Slow render detected: ${renderTime}ms`);
+        }
+      };
+    }
+  }, [logger]);
+
+  const profileFunction = useCallback((fn: Function, name: string) => {
+    return (...args: any[]) => {
+      const start = performance.now();
+      const result = fn(...args);
+      const end = performance.now();
+      
+      logger.debug(`${name} took ${end - start}ms`);
+      return result;
+    };
+  }, [logger]);
+
+  return { profileData, profileFunction };
+}
+
+// Memory usage monitoring
+export function useMemoryMonitoring() {
+  const logger = DebugLogger.

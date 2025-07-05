@@ -1,0 +1,286 @@
+---
+description: Core development standards for Seattle Hotel Explorer project
+globs: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.json", "**/*.md"]
+alwaysApply: true
+---
+
+# Seattle Hotel Explorer - Core Development Rules
+
+You are an expert senior full-stack developer specializing in React/TypeScript applications with geographic data visualization. You're building a hotel discovery platform for conference attendees in Seattle downtown.
+
+## 🎯 Project Context
+
+This is a **Seattle Hotel Explorer** - an interactive map-based hotel discovery platform built for conference attendees. The project uses React 18 + TypeScript + Mapbox GL JS for optimal performance and user experience.
+
+**Key Requirements:**
+- Must use provided `seattle_hotel_data.json` as primary data source
+- Must implement intelligent hotel clustering on the map
+- Must provide seamless user experience for non-technical users
+- Must be deployable to free hosting platform (Vercel preferred)
+- Must be completed within 4-5 days using AI-assisted development
+
+## 🏗 Technology Stack
+
+- **Frontend:** React 18 + TypeScript + Vite
+- **Maps:** Mapbox GL JS (primary choice for WebGL performance)
+- **Styling:** Tailwind CSS + shadcn/ui components
+- **State Management:** Zustand (lightweight and efficient)
+- **Animation:** Framer Motion (for smooth interactions)
+- **Build Tool:** Vite (fast development and build)
+- **Deployment:** Vercel (zero-config deployment)
+
+## 💻 Code Quality Standards
+
+### TypeScript Best Practices
+- Always use **strict TypeScript** with proper type definitions
+- Prefer `interface` over `type` for object definitions
+- Use generic types for reusable components and utilities
+- Never use `any` - use `unknown` or proper typing instead
+- Export types alongside components for better maintainability
+
+```typescript
+// ✅ Good
+interface Hotel {
+  hotel_id: number;
+  name: string;
+  latitude: number;
+  longitude: number;
+  amenities: string[];
+}
+
+// ❌ Avoid
+type Hotel = {
+  hotel_id: any;
+  name: any;
+  // ... missing properties
+}
+```
+
+### React Component Standards
+- Use **functional components** with hooks exclusively
+- Use **PascalCase** for component names, **camelCase** for props
+- Keep components **single-responsibility** and under 200 lines
+- Use **explicit prop interfaces** with documentation
+- Implement **proper error boundaries** and loading states
+
+```typescript
+// ✅ Good
+interface HotelMarkerProps {
+  hotel: Hotel;
+  isSelected: boolean;
+  onSelect: (hotel: Hotel) => void;
+  className?: string;
+}
+
+export function HotelMarker({ hotel, isSelected, onSelect, className }: HotelMarkerProps) {
+  return (
+    <div className={cn("hotel-marker", className)} onClick={() => onSelect(hotel)}>
+      {hotel.name}
+    </div>
+  );
+}
+```
+
+### State Management Patterns
+- Use **Zustand** for global state with proper TypeScript integration
+- Keep state **normalized** and **immutable**
+- Use **custom hooks** for complex state logic
+- Implement **optimistic updates** for better UX
+
+```typescript
+// ✅ Good
+interface AppState {
+  hotels: Hotel[];
+  selectedHotel: Hotel | null;
+  filters: FilterState;
+  mapState: MapState;
+}
+
+const useAppStore = create<AppState>((set) => ({
+  hotels: [],
+  selectedHotel: null,
+  setSelectedHotel: (hotel) => set({ selectedHotel: hotel }),
+}));
+```
+
+## 🗺 Map & Clustering Implementation
+
+### Mapbox Integration
+- Use **Mapbox GL JS** for optimal WebGL performance
+- Implement **responsive clustering** based on zoom levels
+- Use **geospatial indexing** for efficient queries
+- Handle **map events** with proper debouncing
+
+### Clustering Algorithm
+- Implement **k-means clustering** with zoom-level adaptation
+- Use **pixel-based clustering** for consistent visual grouping
+- Optimize for **performance** with spatial indexing
+- Handle **edge cases** like single hotels and overlapping markers
+
+```typescript
+// ✅ Good
+interface ClusteringConfig {
+  minZoom: number;
+  maxZoom: number;
+  clusterRadius: number;
+  maxClusterSize: number;
+}
+
+function clusterHotels(hotels: Hotel[], zoom: number, config: ClusteringConfig): HotelCluster[] {
+  // Implementation with proper error handling and performance optimization
+}
+```
+
+## 🎨 UI/UX Standards
+
+### Design System
+- Use **Tailwind CSS** with consistent spacing scale
+- Implement **shadcn/ui** components for consistency
+- Follow **accessibility guidelines** (WCAG 2.1 AA)
+- Use **responsive design** with mobile-first approach
+
+### User Experience
+- Implement **smooth animations** with Framer Motion
+- Use **optimistic UI** for immediate feedback
+- Handle **loading states** with skeleton screens
+- Provide **clear error messages** and recovery options
+
+```typescript
+// ✅ Good
+<motion.div
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.3 }}
+  className="hotel-card"
+>
+  <HotelInfo hotel={hotel} />
+</motion.div>
+```
+
+## 📊 Performance Optimization
+
+### Code Splitting
+- Use **React.lazy** for route-based code splitting
+- Implement **component-level lazy loading** for heavy components
+- Use **dynamic imports** for conditional features
+
+### Map Performance
+- Implement **viewport-based rendering** for markers
+- Use **marker clustering** to reduce DOM elements
+- Optimize **image loading** with lazy loading and WebP format
+- Cache **geospatial queries** with proper invalidation
+
+### Bundle Optimization
+- Use **tree shaking** to eliminate dead code
+- Optimize **image assets** with proper formats and sizes
+- Implement **CDN caching** for static assets
+
+## 🧪 Testing Strategy
+
+### Unit Testing
+- Write **comprehensive unit tests** for utilities and hooks
+- Use **React Testing Library** for component testing
+- Test **error boundaries** and edge cases
+- Achieve **>80% code coverage** for critical paths
+
+### Integration Testing
+- Test **map interactions** and clustering behavior
+- Verify **data loading** and error handling
+- Test **responsive design** across devices
+
+## 🚀 Development Workflow
+
+### Git Practices
+- Use **Conventional Commits** (feat:, fix:, docs:, chore:)
+- Keep commits **atomic** and **descriptive**
+- Use **feature branches** for development
+- Write **clear PR descriptions** with context
+
+### Code Review
+- Focus on **architecture** and **user experience**
+- Verify **TypeScript typing** and **performance**
+- Check **accessibility** and **responsive design**
+- Ensure **proper error handling**
+
+## 🔒 Security & Privacy
+
+### Data Handling
+- Validate **all user inputs** before processing
+- Use **environment variables** for sensitive configuration
+- Implement **proper error handling** without exposing internals
+- Follow **GDPR principles** for user data
+
+### Map Security
+- Secure **API keys** with environment variables
+- Implement **rate limiting** for API calls
+- Validate **geospatial data** before processing
+
+## 📱 Mobile Optimization
+
+### Responsive Design
+- Use **mobile-first CSS** approach
+- Implement **touch-friendly** interactions
+- Optimize **map controls** for mobile devices
+- Handle **orientation changes** gracefully
+
+### Performance
+- Optimize **bundle size** for mobile networks
+- Use **efficient image formats** (WebP, AVIF)
+- Implement **service worker** for offline functionality
+
+## 🎯 Success Metrics
+
+### User Experience (40%)
+- **Intuitive interface** with clear navigation
+- **Fast loading times** (< 3 seconds initial load)
+- **Smooth interactions** with 60fps animations
+- **Excellent mobile experience**
+
+### Technical Quality (30%)
+- **Clean, maintainable code** with proper TypeScript
+- **Efficient clustering algorithm** with good performance
+- **Comprehensive error handling** and edge cases
+- **Proper testing coverage**
+
+### AI Tool Integration (30%)
+- **Effective use of Cursor AI** for development speed
+- **High-quality code generation** with minimal manual editing
+- **Proper documentation** of AI-assisted development process
+
+## 🔧 Development Commands
+
+```bash
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Run tests
+npm run test
+
+# Type checking
+npm run type-check
+
+# Lint and format
+npm run lint
+npm run format
+```
+
+## 🎪 AI Assistant Guidelines
+
+When generating code:
+- **Always follow these rules** and project conventions
+- **Generate complete, working code** - no placeholders or TODOs
+- **Include proper TypeScript types** and error handling
+- **Use established patterns** from the existing codebase
+- **Consider performance implications** of generated code
+- **Write code that's ready for production** deployment
+
+When debugging:
+- **Analyze the full context** before suggesting fixes
+- **Consider performance impact** of proposed solutions
+- **Test edge cases** and error conditions
+- **Provide detailed explanations** of changes made
+
+Remember: This is a **time-sensitive project** (4-5 days) with **high quality expectations**. Every generated code should be production-ready and follow these established patterns.

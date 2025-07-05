@@ -1,0 +1,940 @@
+---
+description: Performance optimization standards for Seattle Hotel Explorer
+globs: ["**/*.ts", "**/*.tsx", "**/utils/**/*.ts", "**/hooks/**/*.ts"]
+alwaysApply: false
+---
+
+# Performance Optimization Standards
+
+You are an expert in React performance optimization and web vitals. Focus on creating a fast, responsive hotel discovery application that loads quickly and provides smooth interactions.
+
+## 🚀 Core Web Vitals Targets
+
+### Performance Metrics
+- **Largest Contentful Paint (LCP)**: < 2.5 seconds
+- **First Input Delay (FID)**: < 100 milliseconds
+- **Cumulative Layout Shift (CLS)**: < 0.1
+- **Time to Interactive (TTI)**: < 5 seconds
+- **Total Blocking Time (TBT)**: < 300 milliseconds
+
+### Measurement & Monitoring
+- Use **Lighthouse** for performance audits
+- Implement **Web Vitals** monitoring
+- Monitor **bundle size** with webpack-bundle-analyzer
+- Track **API response times** and error rates
+
+```typescript
+// ✅ Good Performance Monitoring
+import { getCLS, getFID, getFCP, getLCP, getTTFB } from 'web-vitals';
+
+export function initPerformanceMonitoring() {
+  getCLS(console.log);
+  getFID(console.log);
+  getFCP(console.log);
+  getLCP(console.log);
+  getTTFB(console.log);
+}
+
+// Performance observer for custom metrics
+export function trackCustomMetric(name: string, value: number) {
+  if (typeof window !== 'undefined' && 'performance' in window) {
+    performance.mark(`${name}-start`);
+    performance.mark(`${name}-end`);
+    performance.measure(name, `${name}-start`, `${name}-end`);
+  }
+}
+```
+
+## 📦 Bundle Optimization
+
+### Code Splitting
+- Use **React.lazy** for route-based splitting
+- Implement **component-level** code splitting
+- Use **dynamic imports** for conditional features
+- Split **vendor bundles** from application code
+
+```typescript
+// ✅ Good Code Splitting
+// Route-based splitting
+const MapView = React.lazy(() => import('../pages/MapView'));
+const HotelDetails = React.lazy(() => import('../pages/HotelDetails'));
+const SearchResults = React.lazy(() => import('../pages/SearchResults'));
+
+// Component-level splitting
+const HotelMap = React.lazy(() => import('../components/HotelMap'));
+const FilterPanel = React.lazy(() => import('../components/FilterPanel'));
+
+// Feature-based splitting
+const loadAdvancedFilters = () => import('../features/AdvancedFilters');
+const loadHotelComparison = () => import('../features/HotelComparison');
+
+// Dynamic feature loading
+export function useFeatureToggle(featureName: string) {
+  const [feature, setFeature] = useState(null);
+  
+  useEffect(() => {
+    if (shouldLoadFeature(featureName)) {
+      const loadFeature = async () => {
+        const module = await import(`../features/${featureName}`);
+        setFeature(module.default);
+      };
+      loadFeature();
+    }
+  }, [featureName]);
+  
+  return feature;
+}
+```
+
+### Tree Shaking
+- Use **ES6 modules** for better tree shaking
+- Import **specific functions** instead of entire libraries
+- Use **webpack-bundle-analyzer** to identify unused code
+- Implement **side-effect free** utility functions
+
+```typescript
+// ✅ Good Tree Shaking
+// Import specific functions
+import { debounce } from 'lodash/debounce';
+import { clusterDbscan } from 'ml-dbscan';
+
+// ❌ Avoid importing entire libraries
+// import _ from 'lodash';
+// import * as ml from 'ml-dbscan';
+
+// Side-effect free utilities
+export const formatPrice = (price: number, currency: string = 'USD'): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+  }).format(price);
+};
+
+export const calculateDistance = (point1: GeoPoint, point2: GeoPoint): number => {
+  // Pure function with no side effects
+  return Math.sqrt(
+    Math.pow(point2.lat - point1.lat, 2) + 
+    Math.pow(point2.lng - point1.lng, 2)
+  );
+};
+```
+
+## 🖼 Image Optimization
+
+### Image Loading Strategy
+- Use **WebP format** with fallbacks
+- Implement **lazy loading** for images
+- Use **placeholder images** or blur effects
+- Optimize **image dimensions** for different screen sizes
+
+```typescript
+// ✅ Good Image Optimization
+interface OptimizedImageProps {
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
+  className?: string;
+  priority?: boolean;
+}
+
+export function OptimizedImage({ 
+  src, 
+  alt, 
+  width, 
+  height, 
+  className,
+  priority = false 
+}: OptimizedImageProps) {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [error, setError] = useState(false);
+
+  const webpSrc = src.replace(/\.(jpg|jpeg|png)$/, '.webp');
+  
+  return (
+    <picture className={cn("relative overflow-hidden", className)}>
+      <source srcSet={webpSrc} type="image/webp" />
+      <img
+        src={src}
+        alt={alt}
+        width={width}
+        height={height}
+        loading={priority ? 'eager' : 'lazy'}
+        onLoad={() => setIsLoaded(true)}
+        onError={() => setError(true)}
+        className={cn(
+          "transition-opacity duration-300",
+          isLoaded ? "opacity-100" : "opacity-0"
+        )}
+      />
+      {!isLoaded && !error && (
+        <div 
+          className="absolute inset-0 bg-gray-200 animate-pulse"
+          style={{ width, height }}
+        />
+      )}
+    </picture>
+  );
+}
+
+// Image preloading utility
+export function preloadImage(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve();
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+```
+
+## 🔄 React Performance Optimization
+
+### Memoization Strategies
+- Use **React.memo** for expensive components
+- Use **useMemo** for expensive calculations
+- Use **useCallback** for event handlers
+- Implement **proper dependency arrays**
+
+```typescript
+// ✅ Good Memoization
+interface HotelListProps {
+  hotels: Hotel[];
+  selectedHotel: Hotel | null;
+  onHotelSelect: (hotel: Hotel) => void;
+  filters: FilterState;
+}
+
+export const HotelList = React.memo(function HotelList({
+  hotels,
+  selectedHotel,
+  onHotelSelect,
+  filters
+}: HotelListProps) {
+  // Memoize expensive filtering operation
+  const filteredHotels = useMemo(() => {
+    return hotels.filter(hotel => {
+      return (
+        hotel.price_per_night >= filters.priceRange[0] &&
+        hotel.price_per_night <= filters.priceRange[1] &&
+        hotel.rating >= filters.minRating &&
+        (filters.amenities.length === 0 || 
+         filters.amenities.every(amenity => hotel.amenities.includes(amenity)))
+      );
+    });
+  }, [hotels, filters]);
+
+  // Memoize event handler
+  const handleHotelSelect = useCallback((hotel: Hotel) => {
+    onHotelSelect(hotel);
+  }, [onHotelSelect]);
+
+  return (
+    <div className="hotel-list">
+      {filteredHotels.map(hotel => (
+        <HotelCard
+          key={hotel.hotel_id}
+          hotel={hotel}
+          isSelected={selectedHotel?.hotel_id === hotel.hotel_id}
+          onSelect={handleHotelSelect}
+        />
+      ))}
+    </div>
+  );
+});
+
+// Custom hook for expensive operations
+export function useExpensiveCalculation(data: any[], dependency: any) {
+  return useMemo(() => {
+    // Expensive calculation here
+    return data.reduce((acc, item) => {
+      // Complex processing
+      return acc + item.value;
+    }, 0);
+  }, [data, dependency]);
+}
+```
+
+### Virtual Scrolling
+- Implement **virtual scrolling** for large lists
+- Use **react-window** or **react-virtualized**
+- Optimize **item height** calculations
+- Handle **dynamic content** sizes
+
+```typescript
+// ✅ Good Virtual Scrolling
+import { FixedSizeList as List } from 'react-window';
+
+interface VirtualizedHotelListProps {
+  hotels: Hotel[];
+  onHotelSelect: (hotel: Hotel) => void;
+  height: number;
+}
+
+export function VirtualizedHotelList({ 
+  hotels, 
+  onHotelSelect, 
+  height 
+}: VirtualizedHotelListProps) {
+  const itemHeight = 120; // Fixed height for each hotel card
+
+  const renderHotelItem = useCallback(({ index, style }: any) => {
+    const hotel = hotels[index];
+    return (
+      <div style={style}>
+        <HotelCard
+          hotel={hotel}
+          onSelect={onHotelSelect}
+        />
+      </div>
+    );
+  }, [hotels, onHotelSelect]);
+
+  return (
+    <List
+      height={height}
+      itemCount={hotels.length}
+      itemSize={itemHeight}
+      itemData={hotels}
+      overscanCount={5}
+    >
+      {renderHotelItem}
+    </List>
+  );
+}
+```
+
+## 🗺 Map Performance Optimization
+
+### Efficient Marker Management
+- Use **marker clustering** to reduce DOM elements
+- Implement **viewport-based rendering**
+- Use **object pooling** for marker instances
+- Optimize **marker update** algorithms
+
+```typescript
+// ✅ Good Marker Performance
+export function useEfficientMarkers(hotels: Hotel[], viewport: ViewState) {
+  const [visibleHotels, setVisibleHotels] = useState<Hotel[]>([]);
+  const [markerPool, setMarkerPool] = useState<Map<number, MarkerInstance>>(new Map());
+
+  // Viewport-based filtering with debouncing
+  const debouncedViewportUpdate = useMemo(
+    () => debounce((newViewport: ViewState) => {
+      const bounds = calculateBounds(newViewport);
+      const visible = hotels.filter(hotel => 
+        isInBounds(hotel, bounds)
+      );
+      setVisibleHotels(visible);
+    }, 100),
+    [hotels]
+  );
+
+  useEffect(() => {
+    debouncedViewportUpdate(viewport);
+  }, [viewport, debouncedViewportUpdate]);
+
+  // Marker pooling for efficient reuse
+  const getMarkerFromPool = useCallback((hotel: Hotel): MarkerInstance => {
+    let marker = markerPool.get(hotel.hotel_id);
+    if (!marker) {
+      marker = createMarkerInstance(hotel);
+      setMarkerPool(prev => new Map(prev).set(hotel.hotel_id, marker));
+    }
+    return marker;
+  }, [markerPool]);
+
+  return { visibleHotels, getMarkerFromPool };
+}
+
+// Clustering optimization
+export function useOptimizedClustering(hotels: Hotel[], zoom: number) {
+  return useMemo(() => {
+    // Skip clustering for small datasets
+    if (hotels.length < 10) {
+      return hotels.map(hotel => ({ ...hotel, isCluster: false }));
+    }
+
+    // Use different clustering strategies based on zoom level
+    if (zoom > 15) {
+      return hotels.map(hotel => ({ ...hotel, isCluster: false }));
+    } else if (zoom > 12) {
+      return performLightClustering(hotels);
+    } else {
+      return performHeavyClustering(hotels);
+    }
+  }, [hotels, zoom]);
+}
+```
+
+## 🔄 State Management Performance
+
+### Efficient State Updates
+- Use **normalized state** structure
+- Implement **selective updates** with Zustand
+- Use **immer** for complex state mutations
+- Optimize **state selectors** with memoization
+
+```typescript
+// ✅ Good State Performance
+interface AppState {
+  hotels: Record<number, Hotel>;
+  hotelIds: number[];
+  selectedHotelId: number | null;
+  filters: FilterState;
+  ui: UIState;
+}
+
+export const useAppStore = create<AppState>((set, get) => ({
+  hotels: {},
+  hotelIds: [],
+  selectedHotelId: null,
+  filters: initialFilters,
+  ui: initialUIState,
+
+  // Efficient batch updates
+  setHotels: (hotels: Hotel[]) => set(state => {
+    const hotelMap = hotels.reduce((acc, hotel) => {
+      acc[hotel.hotel_id] = hotel;
+      return acc;
+    }, {} as Record<number, Hotel>);
+
+    return {
+      hotels: hotelMap,
+      hotelIds: hotels.map(h => h.hotel_id),
+    };
+  }),
+
+  // Selective updates
+  updateHotel: (hotelId: number, updates: Partial<Hotel>) => set(state => ({
+    hotels: {
+      ...state.hotels,
+      [hotelId]: { ...state.hotels[hotelId], ...updates }
+    }
+  })),
+
+  // Optimized selectors
+  getFilteredHotels: () => {
+    const { hotels, hotelIds, filters } = get();
+    return hotelIds
+      .map(id => hotels[id])
+      .filter(hotel => matchesFilters(hotel, filters));
+  },
+}));
+
+// Memoized selectors
+export const selectFilteredHotels = createSelector(
+  (state: AppState) => state.hotels,
+  (state: AppState) => state.hotelIds,
+  (state: AppState) => state.filters,
+  (hotels, hotelIds, filters) => {
+    return hotelIds
+      .map(id => hotels[id])
+      .filter(hotel => matchesFilters(hotel, filters));
+  }
+);
+```
+
+## 🌐 Network Performance
+
+### API Optimization
+- Use **data fetching** with proper caching
+- Implement **request deduplication**
+- Use **pagination** for large datasets
+- Optimize **API response** sizes
+
+```typescript
+// ✅ Good Network Performance
+export function useOptimizedHotelData() {
+  const [hotels, setHotels] = useState<Hotel[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Cache API responses
+  const cacheKey = 'seattle-hotels';
+  const cacheTimeout = 5 * 60 * 1000; // 5 minutes
+
+  useEffect(() => {
+    const loadHotels = async () => {
+      try {
+        // Check cache first
+        const cached = getCachedData(cacheKey);
+        if (cached && Date.now() - cached.timestamp < cacheTimeout) {
+          setHotels(cached.data);
+          setLoading(false);
+          return;
+        }
+
+        // Fetch with compression
+        const response = await fetch('/api/hotels', {
+          headers: {
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Accept': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        // Cache the response
+        setCachedData(cacheKey, {
+          data,
+          timestamp: Date.now(),
+        });
+
+        setHotels(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unknown error');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadHotels();
+  }, []);
+
+  return { hotels, loading, error };
+}
+
+// Request deduplication
+const pendingRequests = new Map<string, Promise<any>>();
+
+export function dedupeRequest<T>(key: string, requestFn: () => Promise<T>): Promise<T> {
+  if (pendingRequests.has(key)) {
+    return pendingRequests.get(key)!;
+  }
+
+  const promise = requestFn().finally(() => {
+    pendingRequests.delete(key);
+  });
+
+  pendingRequests.set(key, promise);
+  return promise;
+}
+
+// Prefetch critical resources
+export function prefetchCriticalResources() {
+  // Preload hotel data
+  const hotelDataPromise = dedupeRequest('hotels', () => 
+    fetch('/api/hotels').then(r => r.json())
+  );
+
+  // Preload map tiles
+  const mapTilesPromise = preloadMapTiles();
+
+  return Promise.all([hotelDataPromise, mapTilesPromise]);
+}
+```
+
+## 📱 Mobile Performance
+
+### Touch Performance
+- Use **passive event listeners** for smooth scrolling
+- Implement **touch-friendly** interactions
+- Optimize **gesture handling** for maps
+- Use **CSS transforms** for smooth animations
+
+```typescript
+// ✅ Good Mobile Performance
+export function useTouchOptimizedMap() {
+  const mapRef = useRef<MapRef>(null);
+
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+
+    // Passive touch listeners for better performance
+    const handleTouchStart = (e: TouchEvent) => {
+      // Handle touch start
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      // Handle touch move with throttling
+    };
+
+    map.getContainer().addEventListener('touchstart', handleTouchStart, { passive: true });
+    map.getContainer().addEventListener('touchmove', handleTouchMove, { passive: true });
+
+    return () => {
+      map.getContainer().removeEventListener('touchstart', handleTouchStart);
+      map.getContainer().removeEventListener('touchmove', handleTouchMove);
+    };
+  }, []);
+
+  return mapRef;
+}
+
+// CSS-in-JS optimizations for mobile
+const mobileOptimizedStyles = {
+  hotelCard: {
+    // Use transform for smooth animations
+    transform: 'translateZ(0)', // Enable hardware acceleration
+    willChange: 'transform, opacity',
+    // Avoid layout thrashing
+    contain: 'layout style paint',
+  },
+  
+  mapContainer: {
+    // Optimize for mobile rendering
+    transform: 'translate3d(0, 0, 0)',
+    backfaceVisibility: 'hidden',
+    perspective: 1000,
+  },
+};
+```
+
+### Bundle Size for Mobile
+- Use **dynamic imports** for mobile-specific features
+- Implement **progressive loading** of features
+- Optimize **initial bundle** size
+- Use **service workers** for caching
+
+```typescript
+// ✅ Good Mobile Bundle Optimization
+export function useMobileOptimizedFeatures() {
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileFeatures, setMobileFeatures] = useState<any>(null);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      
+      // Load mobile-specific features only on mobile
+      if (mobile && !mobileFeatures) {
+        import('../features/mobile').then(module => {
+          setMobileFeatures(module.default);
+        });
+      }
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, [mobileFeatures]);
+
+  return { isMobile, mobileFeatures };
+}
+
+// Progressive feature loading
+export function useProgressiveFeatures() {
+  const [loadedFeatures, setLoadedFeatures] = useState<Set<string>>(new Set());
+
+  const loadFeature = useCallback(async (featureName: string) => {
+    if (loadedFeatures.has(featureName)) return;
+
+    try {
+      await import(`../features/${featureName}`);
+      setLoadedFeatures(prev => new Set(prev).add(featureName));
+    } catch (error) {
+      console.error(`Failed to load feature: ${featureName}`, error);
+    }
+  }, [loadedFeatures]);
+
+  return { loadedFeatures, loadFeature };
+}
+```
+
+## 🔄 Animation Performance
+
+### Smooth Animations
+- Use **CSS transforms** instead of layout properties
+- Implement **requestAnimationFrame** for custom animations
+- Use **will-change** property strategically
+- Optimize **Framer Motion** configurations
+
+```typescript
+// ✅ Good Animation Performance
+export function useOptimizedAnimations() {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReducedMotion(mediaQuery.matches);
+
+    const handler = (e: MediaQueryListEvent) => {
+      setPrefersReducedMotion(e.matches);
+    };
+
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, []);
+
+  return { prefersReducedMotion };
+}
+
+// Optimized Framer Motion variants
+export const optimizedAnimationVariants = {
+  hotel: {
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -20 },
+    transition: {
+      duration: 0.2,
+      ease: "easeOut",
+    },
+  },
+  
+  map: {
+    initial: { scale: 0.95, opacity: 0 },
+    animate: { scale: 1, opacity: 1 },
+    transition: {
+      duration: 0.3,
+      ease: "easeInOut",
+    },
+  },
+};
+
+// Custom animation hook with performance optimization
+export function usePerformantAnimation(elementRef: RefObject<HTMLElement>) {
+  const animate = useCallback((keyframes: Keyframe[], options: KeyframeAnimationOptions) => {
+    if (!elementRef.current) return;
+
+    // Use Web Animations API for better performance
+    const animation = elementRef.current.animate(keyframes, {
+      ...options,
+      composite: 'replace', // Better performance than 'add'
+    });
+
+    return animation;
+  }, [elementRef]);
+
+  return animate;
+}
+```
+
+## 🧪 Performance Testing
+
+### Performance Monitoring
+- Use **React DevTools Profiler** for component analysis
+- Implement **performance budgets** in CI/CD
+- Monitor **runtime performance** with custom metrics
+- Use **Lighthouse CI** for automated audits
+
+```typescript
+// ✅ Good Performance Testing
+export function usePerformanceProfiler() {
+  const [profileData, setProfileData] = useState<any>(null);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      const profiler = {
+        mark: (name: string) => {
+          performance.mark(name);
+        },
+        measure: (name: string, startMark: string, endMark: string) => {
+          performance.measure(name, startMark, endMark);
+        },
+        getEntriesByType: (type: string) => {
+          return performance.getEntriesByType(type);
+        },
+      };
+
+      // Track component render times
+      profiler.mark('component-render-start');
+      
+      return () => {
+        profiler.mark('component-render-end');
+        profiler.measure('component-render', 'component-render-start', 'component-render-end');
+        
+        const measures = profiler.getEntriesByType('measure');
+        setProfileData(measures);
+      };
+    }
+  }, []);
+
+  return profileData;
+}
+
+// Performance budget checks
+export const performanceBudget = {
+  maxBundleSize: 250 * 1024, // 250KB
+  maxImageSize: 100 * 1024,  // 100KB
+  maxLCP: 2500,              // 2.5 seconds
+  maxFID: 100,               // 100ms
+  maxCLS: 0.1,               // 0.1
+};
+
+export function checkPerformanceBudget(metrics: any) {
+  const violations = [];
+  
+  if (metrics.bundleSize > performanceBudget.maxBundleSize) {
+    violations.push(`Bundle size exceeds budget: ${metrics.bundleSize}KB`);
+  }
+  
+  if (metrics.lcp > performanceBudget.maxLCP) {
+    violations.push(`LCP exceeds budget: ${metrics.lcp}ms`);
+  }
+  
+  return violations;
+}
+```
+
+## 📊 Memory Management
+
+### Memory Optimization
+- Use **WeakMap** and **WeakSet** for automatic cleanup
+- Implement **proper cleanup** in useEffect
+- Avoid **memory leaks** with event listeners
+- Use **object pooling** for frequently created objects
+
+```typescript
+// ✅ Good Memory Management
+export function useMemoryOptimizedStore() {
+  const [cache] = useState(() => new WeakMap());
+  const [objectPool] = useState(() => new Map());
+
+  const getPooledObject = useCallback((type: string) => {
+    let pool = objectPool.get(type);
+    if (!pool) {
+      pool = [];
+      objectPool.set(type, pool);
+    }
+    
+    return pool.pop() || createNewObject(type);
+  }, [objectPool]);
+
+  const returnToPool = useCallback((type: string, object: any) => {
+    const pool = objectPool.get(type);
+    if (pool && pool.length < 100) { // Limit pool size
+      resetObject(object);
+      pool.push(object);
+    }
+  }, [objectPool]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      objectPool.clear();
+    };
+  }, [objectPool]);
+
+  return { cache, getPooledObject, returnToPool };
+}
+
+// Memory leak prevention
+export function useMemoryLeakPrevention() {
+  const timeoutsRef = useRef<Set<NodeJS.Timeout>>(new Set());
+  const intervalsRef = useRef<Set<NodeJS.Timeout>>(new Set());
+  const listenersRef = useRef<Array<{
+    element: EventTarget;
+    event: string;
+    handler: EventListener;
+  }>>([]);
+
+  const setTimeout = useCallback((callback: () => void, delay: number) => {
+    const timeout = global.setTimeout(callback, delay);
+    timeoutsRef.current.add(timeout);
+    return timeout;
+  }, []);
+
+  const setInterval = useCallback((callback: () => void, delay: number) => {
+    const interval = global.setInterval(callback, delay);
+    intervalsRef.current.add(interval);
+    return interval;
+  }, []);
+
+  const addEventListener = useCallback((
+    element: EventTarget,
+    event: string,
+    handler: EventListener,
+    options?: AddEventListenerOptions
+  ) => {
+    element.addEventListener(event, handler, options);
+    listenersRef.current.push({ element, event, handler });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      // Cleanup timeouts
+      timeoutsRef.current.forEach(timeout => clearTimeout(timeout));
+      timeoutsRef.current.clear();
+
+      // Cleanup intervals
+      intervalsRef.current.forEach(interval => clearInterval(interval));
+      intervalsRef.current.clear();
+
+      // Cleanup event listeners
+      listenersRef.current.forEach(({ element, event, handler }) => {
+        element.removeEventListener(event, handler);
+      });
+      listenersRef.current.length = 0;
+    };
+  }, []);
+
+  return { setTimeout, setInterval, addEventListener };
+}
+```
+
+## 🔧 Build Performance
+
+### Webpack Optimizations
+- Use **production builds** with proper minification
+- Implement **tree shaking** for unused code
+- Use **compression** for static assets
+- Optimize **chunk splitting** strategy
+
+```javascript
+// ✅ Good Webpack Configuration
+module.exports = {
+  optimization: {
+    splitChunks: {
+      chunks: 'all',
+      cacheGroups: {
+        vendor: {
+          test: /[\\/]node_modules[\\/]/,
+          name: 'vendors',
+          chunks: 'all',
+        },
+        common: {
+          name: 'common',
+          minChunks: 2,
+          priority: -10,
+          reuseExistingChunk: true,
+        },
+      },
+    },
+    usedExports: true,
+    sideEffects: false,
+  },
+  
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+    },
+  },
+  
+  plugins: [
+    new CompressionPlugin({
+      algorithm: 'gzip',
+      test: /\.(js|css|html|svg)$/,
+      threshold: 1024,
+      minRatio: 0.8,
+    }),
+  ],
+};
+```
+
+## 🎯 AI Assistant Guidelines
+
+When optimizing performance:
+- **Always measure** before and after optimizations
+- **Use React DevTools Profiler** to identify bottlenecks
+- **Implement performance budgets** and stick to them
+- **Consider mobile performance** as a priority
+- **Use proper memoization** without over-optimizing
+- **Profile memory usage** and prevent leaks
+- **Test performance** across different devices and network conditions
+
+When writing performance-critical code:
+- **Use TypeScript** for better static analysis
+- **Implement proper error handling** that doesn't impact performance
+- **Use efficient data structures** and algorithms
+- **Avoid premature optimization** but plan for scale
+- **Document performance considerations** in code comments
+- **Test edge cases** that might impact performance
+
+Remember: Performance is a **feature**, not an afterthought. Every optimization should be **measured** and **justified** with real performance improvements.

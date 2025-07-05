@@ -1,0 +1,451 @@
+---
+description: React component development standards for Seattle Hotel Explorer
+globs: ["**/*.tsx", "**/*.jsx", "src/components/**/*.ts"]
+alwaysApply: false
+---
+
+# React Component Development Standards
+
+You are an expert React developer creating components for a hotel discovery platform. Focus on creating reusable, performant, and accessible components.
+
+## 🏗 Component Architecture
+
+### Component Structure
+- Use **functional components** with hooks exclusively
+- Keep components **focused** and **single-responsibility**
+- Extract **custom hooks** for complex logic
+- Use **composition patterns** over inheritance
+
+```typescript
+// ✅ Good Component Structure
+interface HotelCardProps {
+  hotel: Hotel;
+  isSelected?: boolean;
+  onSelect?: (hotel: Hotel) => void;
+  className?: string;
+}
+
+export function HotelCard({ hotel, isSelected = false, onSelect, className }: HotelCardProps) {
+  const handleClick = useCallback(() => {
+    onSelect?.(hotel);
+  }, [hotel, onSelect]);
+
+  return (
+    <motion.div
+      className={cn("hotel-card", isSelected && "selected", className)}
+      onClick={handleClick}
+      whileHover={{ scale: 1.02 }}
+      transition={{ duration: 0.2 }}
+    >
+      <HotelImage src={hotel.image_url} alt={hotel.name} />
+      <HotelInfo hotel={hotel} />
+    </motion.div>
+  );
+}
+```
+
+### Custom Hooks Patterns
+- Extract **stateful logic** into custom hooks
+- Use **descriptive names** with "use" prefix
+- Return **objects** for multiple values (not arrays)
+- Include **TypeScript generics** for reusability
+
+```typescript
+// ✅ Good Custom Hook
+interface UseHotelFiltersReturn {
+  filteredHotels: Hotel[];
+  filters: FilterState;
+  updateFilters: (filters: Partial<FilterState>) => void;
+  clearFilters: () => void;
+  isLoading: boolean;
+}
+
+export function useHotelFilters(hotels: Hotel[]): UseHotelFiltersReturn {
+  const [filters, setFilters] = useState<FilterState>(initialFilters);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const filteredHotels = useMemo(() => {
+    return applyFilters(hotels, filters);
+  }, [hotels, filters]);
+
+  const updateFilters = useCallback((newFilters: Partial<FilterState>) => {
+    setFilters(prev => ({ ...prev, ...newFilters }));
+  }, []);
+
+  return {
+    filteredHotels,
+    filters,
+    updateFilters,
+    clearFilters: () => setFilters(initialFilters),
+    isLoading,
+  };
+}
+```
+
+## 🎨 Styling Standards
+
+### Tailwind CSS Usage
+- Use **utility classes** for consistent spacing
+- Create **component variants** with cn() helper
+- Use **CSS variables** for theme customization
+- Implement **responsive design** with mobile-first approach
+
+```typescript
+// ✅ Good Tailwind Usage
+const hotelCardVariants = {
+  default: "p-4 rounded-lg border bg-white shadow-sm hover:shadow-md transition-shadow",
+  selected: "ring-2 ring-blue-500 bg-blue-50",
+  compact: "p-2 text-sm"
+};
+
+export function HotelCard({ variant = "default", ...props }: HotelCardProps) {
+  return (
+    <div className={cn(hotelCardVariants[variant], props.className)}>
+      {/* Content */}
+    </div>
+  );
+}
+```
+
+### Animation Guidelines
+- Use **Framer Motion** for smooth animations
+- Keep animations **subtle** and **purposeful**
+- Use **consistent timing** (0.2s for micro-interactions)
+- Implement **reduced motion** accessibility
+
+```typescript
+// ✅ Good Animation Usage
+const mapMarkerVariants = {
+  hidden: { opacity: 0, scale: 0.8 },
+  visible: { opacity: 1, scale: 1 },
+  selected: { opacity: 1, scale: 1.2 }
+};
+
+export function MapMarker({ hotel, isSelected, isVisible }: MapMarkerProps) {
+  return (
+    <motion.div
+      variants={mapMarkerVariants}
+      initial="hidden"
+      animate={isVisible ? (isSelected ? "selected" : "visible") : "hidden"}
+      transition={{ duration: 0.2, ease: "easeInOut" }}
+      className="map-marker"
+    >
+      <HotelPin hotel={hotel} />
+    </motion.div>
+  );
+}
+```
+
+## 🧠 State Management
+
+### Zustand Integration
+- Use **typed stores** with proper interfaces
+- Keep store **slices focused** on specific domains
+- Use **selectors** for derived state
+- Implement **optimistic updates** for UX
+
+```typescript
+// ✅ Good Zustand Store
+interface HotelStore {
+  // State
+  hotels: Hotel[];
+  selectedHotel: Hotel | null;
+  filters: FilterState;
+  isLoading: boolean;
+  error: string | null;
+  
+  // Actions
+  setHotels: (hotels: Hotel[]) => void;
+  selectHotel: (hotel: Hotel | null) => void;
+  updateFilters: (filters: Partial<FilterState>) => void;
+  clearFilters: () => void;
+}
+
+export const useHotelStore = create<HotelStore>((set, get) => ({
+  hotels: [],
+  selectedHotel: null,
+  filters: initialFilters,
+  isLoading: false,
+  error: null,
+  
+  setHotels: (hotels) => set({ hotels, isLoading: false }),
+  selectHotel: (hotel) => set({ selectedHotel: hotel }),
+  updateFilters: (newFilters) => set(state => ({ 
+    filters: { ...state.filters, ...newFilters }
+  })),
+  clearFilters: () => set({ filters: initialFilters }),
+}));
+```
+
+### Local Component State
+- Use **useState** for simple component state
+- Use **useReducer** for complex state logic
+- Implement **proper cleanup** in useEffect
+- Use **useCallback** and **useMemo** for performance
+
+```typescript
+// ✅ Good Local State Management
+export function HotelSearchPanel() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<Hotel[]>([]);
+
+  const debouncedSearch = useMemo(
+    () => debounce(async (query: string) => {
+      if (!query.trim()) {
+        setSearchResults([]);
+        return;
+      }
+      
+      setIsSearching(true);
+      try {
+        const results = await searchHotels(query);
+        setSearchResults(results);
+      } catch (error) {
+        console.error('Search failed:', error);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300),
+    []
+  );
+
+  useEffect(() => {
+    debouncedSearch(searchQuery);
+    return () => debouncedSearch.cancel();
+  }, [searchQuery, debouncedSearch]);
+
+  return (
+    <div className="search-panel">
+      <SearchInput 
+        value={searchQuery}
+        onChange={setSearchQuery}
+        placeholder="Search hotels..."
+      />
+      {isSearching && <SearchLoading />}
+      <SearchResults results={searchResults} />
+    </div>
+  );
+}
+```
+
+## 🗺 Map Component Integration
+
+### Mapbox React Integration
+- Use **refs** for map instance access
+- Handle **map lifecycle** properly
+- Implement **efficient marker management**
+- Use **geospatial indexing** for performance
+
+```typescript
+// ✅ Good Map Component
+export function HotelMap({ hotels, selectedHotel, onHotelSelect }: HotelMapProps) {
+  const mapRef = useRef<MapboxMap | null>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [clusters, setClusters] = useState<HotelCluster[]>([]);
+
+  useEffect(() => {
+    if (!mapLoaded || !hotels.length) return;
+
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Update clusters based on current zoom and bounds
+    const zoom = map.getZoom();
+    const bounds = map.getBounds();
+    const visibleHotels = hotels.filter(hotel => 
+      bounds.contains([hotel.longitude, hotel.latitude])
+    );
+
+    const newClusters = clusterHotels(visibleHotels, zoom, clusterConfig);
+    setClusters(newClusters);
+  }, [hotels, mapLoaded]);
+
+  const handleMapLoad = useCallback(() => {
+    setMapLoaded(true);
+  }, []);
+
+  return (
+    <div className="map-container">
+      <Map
+        ref={mapRef}
+        mapboxAccessToken={MAPBOX_TOKEN}
+        initialViewState={SEATTLE_VIEWPORT}
+        style={{ width: "100%", height: "100%" }}
+        mapStyle="mapbox://styles/mapbox/light-v11"
+        onLoad={handleMapLoad}
+        onMove={handleMapMove}
+      >
+        {clusters.map(cluster => (
+          <ClusterMarker
+            key={cluster.id}
+            cluster={cluster}
+            isSelected={selectedHotel?.hotel_id === cluster.hotels[0]?.hotel_id}
+            onSelect={onHotelSelect}
+          />
+        ))}
+      </Map>
+    </div>
+  );
+}
+```
+
+## 🎯 Performance Optimization
+
+### React Performance
+- Use **React.memo** for expensive components
+- Implement **proper key props** for lists
+- Use **useCallback** for event handlers
+- Optimize **re-renders** with proper dependencies
+
+```typescript
+// ✅ Good Performance Optimization
+export const HotelList = React.memo(function HotelList({ 
+  hotels, 
+  selectedHotel, 
+  onHotelSelect 
+}: HotelListProps) {
+  const handleHotelSelect = useCallback((hotel: Hotel) => {
+    onHotelSelect(hotel);
+  }, [onHotelSelect]);
+
+  return (
+    <div className="hotel-list">
+      {hotels.map(hotel => (
+        <HotelCard
+          key={hotel.hotel_id}
+          hotel={hotel}
+          isSelected={selectedHotel?.hotel_id === hotel.hotel_id}
+          onSelect={handleHotelSelect}
+        />
+      ))}
+    </div>
+  );
+});
+```
+
+### Lazy Loading
+- Use **React.lazy** for code splitting
+- Implement **Suspense** with loading states
+- Use **dynamic imports** for heavy components
+
+```typescript
+// ✅ Good Lazy Loading
+const HotelDetailsModal = React.lazy(() => import('./HotelDetailsModal'));
+const MapView = React.lazy(() => import('./MapView'));
+
+export function App() {
+  return (
+    <div className="app">
+      <Suspense fallback={<PageLoading />}>
+        <Routes>
+          <Route path="/" element={<MapView />} />
+          <Route path="/hotel/:id" element={<HotelDetailsModal />} />
+        </Routes>
+      </Suspense>
+    </div>
+  );
+}
+```
+
+## ♿ Accessibility Standards
+
+### WCAG Compliance
+- Use **semantic HTML** elements
+- Implement **proper ARIA** labels
+- Ensure **keyboard navigation** works
+- Maintain **color contrast** ratios
+
+```typescript
+// ✅ Good Accessibility
+export function HotelCard({ hotel, isSelected, onSelect }: HotelCardProps) {
+  return (
+    <article
+      className={cn("hotel-card", isSelected && "selected")}
+      role="button"
+      tabIndex={0}
+      aria-label={`Hotel ${hotel.name}, ${hotel.star_rating} stars, $${hotel.price_per_night} per night`}
+      onClick={() => onSelect(hotel)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect(hotel);
+        }
+      }}
+    >
+      <img 
+        src={hotel.image_url} 
+        alt={`${hotel.name} exterior view`}
+        className="hotel-image"
+      />
+      <div className="hotel-info">
+        <h3 className="hotel-name">{hotel.name}</h3>
+        <div className="hotel-rating" aria-label={`${hotel.rating} out of 10 rating`}>
+          {hotel.rating}/10
+        </div>
+      </div>
+    </article>
+  );
+}
+```
+
+## 🧪 Testing Guidelines
+
+### Component Testing
+- Test **user interactions** and behavior
+- Use **React Testing Library** best practices
+- Test **accessibility** features
+- Mock **external dependencies**
+
+```typescript
+// ✅ Good Component Test
+describe('HotelCard', () => {
+  const mockHotel: Hotel = {
+    hotel_id: 1,
+    name: 'Test Hotel',
+    star_rating: 4,
+    price_per_night: 200,
+    rating: 8.5,
+    // ... other properties
+  };
+
+  it('should call onSelect when clicked', () => {
+    const onSelect = jest.fn();
+    render(<HotelCard hotel={mockHotel} onSelect={onSelect} />);
+    
+    const card = screen.getByRole('button', { name: /test hotel/i });
+    fireEvent.click(card);
+    
+    expect(onSelect).toHaveBeenCalledWith(mockHotel);
+  });
+
+  it('should be keyboard accessible', () => {
+    const onSelect = jest.fn();
+    render(<HotelCard hotel={mockHotel} onSelect={onSelect} />);
+    
+    const card = screen.getByRole('button');
+    fireEvent.keyDown(card, { key: 'Enter' });
+    
+    expect(onSelect).toHaveBeenCalledWith(mockHotel);
+  });
+});
+```
+
+## 🔧 AI Assistant Guidelines
+
+When generating React components:
+- **Always include proper TypeScript interfaces** for props
+- **Use consistent naming conventions** (PascalCase for components)
+- **Include accessibility attributes** (ARIA labels, semantic HTML)
+- **Implement proper error handling** and loading states
+- **Use established patterns** from existing components
+- **Consider performance implications** (memo, callback, useMemo)
+- **Write complete, production-ready code** - no TODOs or placeholders
+
+When refactoring components:
+- **Maintain backward compatibility** with existing prop interfaces
+- **Preserve accessibility** features
+- **Keep performance optimizations** intact
+- **Update related tests** and documentation
+
+Remember: Every component should be **reusable**, **accessible**, and **performant**. Focus on creating a cohesive component library that supports the hotel discovery user experience.

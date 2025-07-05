@@ -1,0 +1,626 @@
+---
+description: Mapbox GL JS integration standards for hotel map visualization
+globs: ["**/map/**/*.ts", "**/map/**/*.tsx", "**/clustering/**/*.ts", "**/hooks/use*Map*.ts"]
+alwaysApply: false
+---
+
+# Mapbox GL JS Integration Standards
+
+You are an expert in Mapbox GL JS and geospatial data visualization. You're building an interactive hotel discovery map with intelligent clustering for optimal user experience.
+
+## 🗺 Map Setup & Configuration
+
+### Mapbox Integration
+- Use **Mapbox GL JS v2.15+** with React integration
+- Configure **access token** via environment variables
+- Use **light theme** for better hotel visibility
+- Implement **proper viewport** management
+
+```typescript
+// ✅ Good Mapbox Configuration
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+
+// Environment configuration
+const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+if (!MAPBOX_TOKEN) {
+  throw new Error('Mapbox access token is required');
+}
+
+// Seattle downtown viewport
+export const SEATTLE_VIEWPORT: ViewState = {
+  longitude: -122.3321,
+  latitude: 47.6062,
+  zoom: 12,
+  pitch: 0,
+  bearing: 0,
+  padding: { top: 20, bottom: 20, left: 20, right: 20 }
+};
+
+// Map style configuration
+export const MAP_STYLE = 'mapbox://styles/mapbox/light-v11';
+```
+
+### Map Component Structure
+- Use **react-map-gl** for React integration
+- Implement **proper ref management** for map instance
+- Handle **map lifecycle events** correctly
+- Use **TypeScript** for all map-related code
+
+```typescript
+// ✅ Good Map Component
+interface HotelMapProps {
+  hotels: Hotel[];
+  selectedHotel: Hotel | null;
+  onHotelSelect: (hotel: Hotel) => void;
+  onMapMove?: (viewport: ViewState) => void;
+  className?: string;
+}
+
+export function HotelMap({ 
+  hotels, 
+  selectedHotel, 
+  onHotelSelect, 
+  onMapMove,
+  className 
+}: HotelMapProps) {
+  const mapRef = useRef<MapRef>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [viewport, setViewport] = useState<ViewState>(SEATTLE_VIEWPORT);
+
+  // Map event handlers
+  const handleMapLoad = useCallback(() => {
+    setMapLoaded(true);
+    console.log('Map loaded successfully');
+  }, []);
+
+  const handleMapMove = useCallback((evt: ViewStateChangeEvent) => {
+    setViewport(evt.viewState);
+    onMapMove?.(evt.viewState);
+  }, [onMapMove]);
+
+  return (
+    <div className={cn("map-container", className)}>
+      <Map
+        ref={mapRef}
+        {...viewport}
+        mapboxAccessToken={MAPBOX_TOKEN}
+        style={{ width: "100%", height: "100%" }}
+        mapStyle={MAP_STYLE}
+        onLoad={handleMapLoad}
+        onMove={handleMapMove}
+        interactiveLayerIds={['hotel-clusters', 'hotel-markers']}
+      >
+        {mapLoaded && (
+          <HotelMarkers
+            hotels={hotels}
+            selectedHotel={selectedHotel}
+            onHotelSelect={onHotelSelect}
+          />
+        )}
+      </Map>
+    </div>
+  );
+}
+```
+
+## 🧮 Clustering Implementation
+
+### Clustering Algorithm
+- Use **geospatial clustering** based on pixel distance
+- Implement **zoom-level adaptive** clustering
+- Use **k-means** or **density-based** clustering
+- Optimize for **performance** with spatial indexing
+
+```typescript
+// ✅ Good Clustering Implementation
+interface ClusteringConfig {
+  minZoom: number;
+  maxZoom: number;
+  clusterRadius: number;          // pixels
+  maxClusterSize: number;
+  minPointsPerCluster: number;
+}
+
+export const DEFAULT_CLUSTERING_CONFIG: ClusteringConfig = {
+  minZoom: 8,
+  maxZoom: 18,
+  clusterRadius: 50,
+  maxClusterSize: 100,
+  minPointsPerCluster: 2,
+};
+
+interface HotelCluster {
+  id: string;
+  center: [number, number];       // [longitude, latitude]
+  hotels: Hotel[];
+  count: number;
+  averagePrice: number;
+  averageRating: number;
+  bounds: BoundingBox;
+}
+
+export function clusterHotels(
+  hotels: Hotel[],
+  zoom: number,
+  bounds: LngLatBounds,
+  config: ClusteringConfig = DEFAULT_CLUSTERING_CONFIG
+): HotelCluster[] {
+  // Filter hotels within viewport
+  const visibleHotels = hotels.filter(hotel =>
+    bounds.contains([hotel.longitude, hotel.latitude])
+  );
+
+  // Skip clustering at high zoom levels
+  if (zoom >= config.maxZoom) {
+    return visibleHotels.map(hotel => ({
+      id: `single-${hotel.hotel_id}`,
+      center: [hotel.longitude, hotel.latitude],
+      hotels: [hotel],
+      count: 1,
+      averagePrice: hotel.price_per_night,
+      averageRating: hotel.rating,
+      bounds: createBoundsFromPoint(hotel.longitude, hotel.latitude),
+    }));
+  }
+
+  // Use supercluster for efficient clustering
+  const clusters = performSupercluster(visibleHotels, zoom, config);
+  
+  return clusters.map(cluster => ({
+    id: cluster.id,
+    center: cluster.geometry.coordinates as [number, number],
+    hotels: cluster.properties.hotels,
+    count: cluster.properties.point_count,
+    averagePrice: calculateAveragePrice(cluster.properties.hotels),
+    averageRating: calculateAverageRating(cluster.properties.hotels),
+    bounds: calculateClusterBounds(cluster.properties.hotels),
+  }));
+}
+
+// Utility functions for clustering
+function performSupercluster(hotels: Hotel[], zoom: number, config: ClusteringConfig) {
+  const index = new Supercluster({
+    radius: config.clusterRadius,
+    maxZoom: config.maxZoom,
+    minZoom: config.minZoom,
+    minPoints: config.minPointsPerCluster,
+  });
+
+  const points = hotels.map(hotel => ({
+    type: 'Feature' as const,
+    geometry: {
+      type: 'Point' as const,
+      coordinates: [hotel.longitude, hotel.latitude],
+    },
+    properties: {
+      hotel_id: hotel.hotel_id,
+      hotel: hotel,
+    },
+  }));
+
+  index.load(points);
+  return index.getClusters([-180, -90, 180, 90], zoom);
+}
+```
+
+### Marker Management
+- Use **React components** for markers
+- Implement **efficient re-rendering** strategies
+- Handle **marker click events** properly
+- Use **custom marker icons** for better UX
+
+```typescript
+// ✅ Good Marker Components
+interface HotelMarkerProps {
+  hotel: Hotel;
+  isSelected: boolean;
+  onClick: (hotel: Hotel) => void;
+  size?: 'small' | 'medium' | 'large';
+}
+
+export function HotelMarker({ hotel, isSelected, onClick, size = 'medium' }: HotelMarkerProps) {
+  const markerSizes = {
+    small: 'w-6 h-6',
+    medium: 'w-8 h-8',
+    large: 'w-10 h-10'
+  };
+
+  return (
+    <Marker
+      longitude={hotel.longitude}
+      latitude={hotel.latitude}
+      anchor="bottom"
+      onClick={(e) => {
+        e.originalEvent.stopPropagation();
+        onClick(hotel);
+      }}
+    >
+      <motion.div
+        className={cn(
+          "hotel-marker",
+          markerSizes[size],
+          isSelected && "selected"
+        )}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.95 }}
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ duration: 0.2 }}
+      >
+        <div className="marker-icon">
+          <HotelIcon />
+        </div>
+        <div className="marker-price">
+          ${hotel.price_per_night}
+        </div>
+      </motion.div>
+    </Marker>
+  );
+}
+
+interface ClusterMarkerProps {
+  cluster: HotelCluster;
+  onClick: (cluster: HotelCluster) => void;
+}
+
+export function ClusterMarker({ cluster, onClick }: ClusterMarkerProps) {
+  const size = Math.min(60, Math.max(30, cluster.count * 2));
+  
+  return (
+    <Marker
+      longitude={cluster.center[0]}
+      latitude={cluster.center[1]}
+      anchor="center"
+      onClick={(e) => {
+        e.originalEvent.stopPropagation();
+        onClick(cluster);
+      }}
+    >
+      <motion.div
+        className="cluster-marker"
+        style={{ width: size, height: size }}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.95 }}
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ duration: 0.2 }}
+      >
+        <div className="cluster-count">{cluster.count}</div>
+        <div className="cluster-price">
+          ${Math.round(cluster.averagePrice)}
+        </div>
+      </motion.div>
+    </Marker>
+  );
+}
+```
+
+## 🎯 Performance Optimization
+
+### Viewport-Based Rendering
+- Only render **visible markers** within viewport
+- Use **bounds checking** for efficient filtering
+- Implement **marker pooling** for large datasets
+- Use **debouncing** for map move events
+
+```typescript
+// ✅ Good Viewport Optimization
+export function useVisibleHotels(hotels: Hotel[], viewport: ViewState) {
+  return useMemo(() => {
+    const bounds = new mapboxgl.LngLatBounds();
+    const padding = 0.01; // Add padding for smooth experience
+
+    bounds.extend([
+      viewport.longitude - padding,
+      viewport.latitude - padding
+    ]);
+    bounds.extend([
+      viewport.longitude + padding,
+      viewport.latitude + padding
+    ]);
+
+    return hotels.filter(hotel =>
+      bounds.contains([hotel.longitude, hotel.latitude])
+    );
+  }, [hotels, viewport]);
+}
+
+// Debounced map move handler
+export function useMapMoveHandler(onMove: (viewport: ViewState) => void) {
+  const debouncedMove = useMemo(
+    () => debounce(onMove, 150),
+    [onMove]
+  );
+
+  useEffect(() => {
+    return () => debouncedMove.cancel();
+  }, [debouncedMove]);
+
+  return debouncedMove;
+}
+```
+
+### Memory Management
+- Clean up **map event listeners** on unmount
+- Use **weak references** for marker management
+- Implement **proper cleanup** in useEffect
+- Monitor **memory usage** with development tools
+
+```typescript
+// ✅ Good Memory Management
+export function useMapEventHandlers(mapRef: RefObject<MapRef>) {
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (!map) return;
+
+    const handleMapClick = (e: mapboxgl.MapMouseEvent) => {
+      // Handle map click
+    };
+
+    const handleMapMove = (e: mapboxgl.MapboxEvent) => {
+      // Handle map move
+    };
+
+    map.on('click', handleMapClick);
+    map.on('moveend', handleMapMove);
+
+    return () => {
+      map.off('click', handleMapClick);
+      map.off('moveend', handleMapMove);
+    };
+  }, [mapRef]);
+}
+```
+
+## 🎨 Visual Design Standards
+
+### Map Styling
+- Use **light theme** for better content visibility
+- Implement **custom styling** for better branding
+- Use **consistent colors** across markers
+- Implement **hover effects** for better UX
+
+```typescript
+// ✅ Good Map Styling
+export const MAP_STYLE_CONFIG = {
+  version: 8,
+  sources: {
+    'mapbox-streets': {
+      url: 'mapbox://mapbox.mapbox-streets-v8',
+      type: 'vector'
+    }
+  },
+  layers: [
+    {
+      id: 'background',
+      type: 'background',
+      paint: {
+        'background-color': '#f8f9fa'
+      }
+    },
+    // Custom layer configurations
+  ]
+};
+
+// Marker color scheme
+export const MARKER_COLORS = {
+  default: '#3b82f6',
+  selected: '#ef4444',
+  cluster: '#10b981',
+  hover: '#6366f1'
+};
+```
+
+### Responsive Design
+- Implement **mobile-friendly** map controls
+- Use **touch-optimized** interaction patterns
+- Handle **orientation changes** gracefully
+- Optimize **performance** for mobile devices
+
+```typescript
+// ✅ Good Responsive Map
+export function ResponsiveMap({ ...props }: HotelMapProps) {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const mapProps = {
+    ...props,
+    touchZoomRotate: true,
+    dragPan: true,
+    scrollZoom: !isMobile, // Disable scroll zoom on mobile
+    doubleClickZoom: true,
+    touchPitch: false,
+  };
+
+  return (
+    <div className="relative w-full h-full">
+      <Map {...mapProps}>
+        {/* Map content */}
+      </Map>
+      
+      {isMobile && (
+        <MobileMapControls />
+      )}
+    </div>
+  );
+}
+```
+
+## 🔧 Map Utilities & Helpers
+
+### Geospatial Utilities
+- Implement **distance calculations** between points
+- Use **proper coordinate transformations**
+- Handle **edge cases** for coordinate validation
+- Implement **bounding box** calculations
+
+```typescript
+// ✅ Good Geospatial Utilities
+export function calculateDistance(
+  point1: [number, number],
+  point2: [number, number]
+): number {
+  const [lon1, lat1] = point1;
+  const [lon2, lat2] = point2;
+  
+  const R = 6371; // Earth's radius in km
+  const dLat = toRadians(lat2 - lat1);
+  const dLon = toRadians(lon2 - lon1);
+  
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+export function createBoundsFromHotels(hotels: Hotel[]): LngLatBounds {
+  const bounds = new mapboxgl.LngLatBounds();
+  
+  hotels.forEach(hotel => {
+    bounds.extend([hotel.longitude, hotel.latitude]);
+  });
+  
+  return bounds;
+}
+
+export function isValidCoordinate(longitude: number, latitude: number): boolean {
+  return (
+    typeof longitude === 'number' &&
+    typeof latitude === 'number' &&
+    !isNaN(longitude) &&
+    !isNaN(latitude) &&
+    longitude >= -180 &&
+    longitude <= 180 &&
+    latitude >= -90 &&
+    latitude <= 90
+  );
+}
+```
+
+## 🎯 User Experience Enhancements
+
+### Interactive Features
+- Implement **smooth animations** for marker transitions
+- Use **popup components** for hotel details
+- Handle **keyboard navigation** for accessibility
+- Implement **search integration** with map
+
+```typescript
+// ✅ Good Interactive Features
+export function InteractiveHotelMap({ hotels, onHotelSelect }: InteractiveHotelMapProps) {
+  const [popup, setPopup] = useState<{
+    hotel: Hotel;
+    longitude: number;
+    latitude: number;
+  } | null>(null);
+
+  const handleMarkerClick = useCallback((hotel: Hotel) => {
+    setPopup({
+      hotel,
+      longitude: hotel.longitude,
+      latitude: hotel.latitude,
+    });
+    onHotelSelect(hotel);
+  }, [onHotelSelect]);
+
+  const handlePopupClose = useCallback(() => {
+    setPopup(null);
+  }, []);
+
+  return (
+    <Map {...mapProps}>
+      {hotels.map(hotel => (
+        <HotelMarker
+          key={hotel.hotel_id}
+          hotel={hotel}
+          onClick={handleMarkerClick}
+        />
+      ))}
+      
+      {popup && (
+        <Popup
+          longitude={popup.longitude}
+          latitude={popup.latitude}
+          onClose={handlePopupClose}
+          closeButton={true}
+          closeOnClick={false}
+          anchor="bottom"
+        >
+          <HotelPopupContent hotel={popup.hotel} />
+        </Popup>
+      )}
+    </Map>
+  );
+}
+```
+
+## 🧪 Testing Map Components
+
+### Unit Testing
+- Test **coordinate calculations** and utilities
+- Mock **Mapbox GL JS** for testing
+- Test **clustering algorithms** with sample data
+- Verify **marker positioning** accuracy
+
+```typescript
+// ✅ Good Map Testing
+describe('Clustering Functions', () => {
+  const mockHotels: Hotel[] = [
+    { hotel_id: 1, longitude: -122.3321, latitude: 47.6062, /* ... */ },
+    { hotel_id: 2, longitude: -122.3340, latitude: 47.6080, /* ... */ },
+  ];
+
+  it('should cluster nearby hotels', () => {
+    const clusters = clusterHotels(mockHotels, 12, mockBounds);
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0].count).toBe(2);
+  });
+
+  it('should not cluster at high zoom levels', () => {
+    const clusters = clusterHotels(mockHotels, 18, mockBounds);
+    expect(clusters).toHaveLength(2);
+  });
+});
+
+describe('Geospatial Utilities', () => {
+  it('should calculate distance correctly', () => {
+    const distance = calculateDistance(
+      [-122.3321, 47.6062],
+      [-122.3340, 47.6080]
+    );
+    expect(distance).toBeCloseTo(0.2, 1); // Approximately 0.2 km
+  });
+});
+```
+
+## 🔧 AI Assistant Guidelines
+
+When working with Mapbox integration:
+- **Always use TypeScript** for type safety with coordinates
+- **Implement proper error handling** for map loading failures
+- **Use environment variables** for API keys and configuration
+- **Optimize for performance** with efficient clustering and rendering
+- **Consider mobile users** with touch-friendly interactions
+- **Handle edge cases** like invalid coordinates or empty datasets
+- **Test geospatial calculations** thoroughly for accuracy
+
+When debugging map issues:
+- **Check browser console** for Mapbox errors
+- **Verify API key permissions** and usage limits
+- **Test coordinate validity** and bounds checking
+- **Monitor performance** with large datasets
+- **Test across different devices** and screen sizes
+
+Remember: The map is the **core feature** of this application. Every interaction should be **smooth**, **intuitive**, and **performant**. Focus on creating an excellent user experience that helps conference attendees find their perfect hotel quickly and easily.
