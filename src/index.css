@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.hotel-marker {
+  @apply bg-primary text-white rounded-full p-2 shadow-lg cursor-pointer transition-transform hover:scale-110;
+}
+
+.cluster-marker {
+  @apply bg-secondary text-white rounded-full p-2 shadow-lg cursor-pointer transition-transform hover:scale-110;
+}
