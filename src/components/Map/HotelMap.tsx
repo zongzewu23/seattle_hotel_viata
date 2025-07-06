@@ -2,16 +2,15 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import Map, {
   NavigationControl,
   GeolocateControl,
-  Marker,
-  Popup,
   type ViewStateChangeEvent,
   type MapRef,
 } from 'react-map-gl';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Star, DollarSign, Users } from 'lucide-react';
+import { MapPin, Users } from 'lucide-react';
 import type { Hotel, Coordinates } from '../../types/index';
-import { normalizePrice } from '../../utils/dataProcessor';
 import { cn } from '../../utils/cn';
+import HotelMarker from './HotelMarker';
+import HotelPopup from './HotelPopup';
 
 // =============================================================================
 // MAPBOX CONFIGURATION
@@ -55,215 +54,7 @@ export interface HotelMapProps {
   mapStyle?: string;
 }
 
-interface HotelMarkerProps {
-  hotel: Hotel;
-  isSelected: boolean;
-  isHovered: boolean;
-  onClick: (hotel: Hotel) => void;
-  onHover: (hotel: Hotel | null) => void;
-}
 
-interface HotelPopupProps {
-  hotel: Hotel;
-  onClose: () => void;
-}
-
-// =============================================================================
-// HOTEL MARKER COMPONENT
-// =============================================================================
-
-const HotelMarker = React.memo<HotelMarkerProps>(({
-  hotel,
-  isSelected,
-  isHovered,
-  onClick,
-  onHover,
-}) => {
-  const markerRef = useRef<HTMLDivElement>(null);
-
-  const handleClick = useCallback((e: any) => {
-    e.originalEvent?.stopPropagation();
-    onClick(hotel);
-  }, [hotel, onClick]);
-
-  const handleMouseEnter = useCallback(() => {
-    onHover(hotel);
-  }, [hotel, onHover]);
-
-  const handleMouseLeave = useCallback(() => {
-    onHover(null);
-  }, [onHover]);
-
-  const markerColor = useMemo(() => {
-    if (isSelected) return '#DC2626'; // red-600
-    if (isHovered) return '#EA580C'; // orange-600
-    if (hotel.rating >= 8.5) return '#059669'; // emerald-600
-    if (hotel.rating >= 7.0) return '#0D9488'; // teal-600
-    return '#6B7280'; // gray-500
-  }, [isSelected, isHovered, hotel.rating]);
-
-  const markerSize = useMemo(() => {
-    if (isSelected) return 40;
-    if (isHovered) return 36;
-    return 32;
-  }, [isSelected, isHovered]);
-
-  return (
-    <Marker
-      latitude={hotel.latitude}
-      longitude={hotel.longitude}
-      anchor="bottom"
-      onClick={handleClick}
-    >
-      <motion.div
-        ref={markerRef}
-        className={cn(
-          'cursor-pointer transition-all duration-200',
-          'hover:scale-110 active:scale-95',
-          isSelected && 'z-10',
-          isHovered && 'z-20'
-        )}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.95 }}
-      >
-        <div
-          className={cn(
-            'relative flex items-center justify-center',
-            'rounded-full border-2 border-white shadow-lg',
-            'transition-all duration-200'
-          )}
-          style={{
-            width: markerSize,
-            height: markerSize,
-            backgroundColor: markerColor,
-          }}
-        >
-          <MapPin
-            className="text-white"
-            size={markerSize * 0.5}
-            fill="currentColor"
-          />
-          
-          {/* Rating badge */}
-          <div
-            className={cn(
-              'absolute -top-2 -right-2',
-              'min-w-[24px] h-6 px-1',
-              'bg-white rounded-full border-2 border-current',
-              'flex items-center justify-center',
-              'text-xs font-bold'
-            )}
-            style={{ color: markerColor }}
-          >
-            {hotel.rating.toFixed(1)}
-          </div>
-        </div>
-      </motion.div>
-    </Marker>
-  );
-});
-
-HotelMarker.displayName = 'HotelMarker';
-
-// =============================================================================
-// HOTEL POPUP COMPONENT
-// =============================================================================
-
-const HotelPopup = React.memo<HotelPopupProps>(({ hotel, onClose }) => {
-  const normalizedPrice = normalizePrice(hotel.price_per_night);
-
-  return (
-    <Popup
-      latitude={hotel.latitude}
-      longitude={hotel.longitude}
-      onClose={onClose}
-      closeButton={true}
-      closeOnClick={false}
-      anchor="top"
-      offset={[0, -10]}
-      maxWidth="320px"
-      className="hotel-popup"
-    >
-      <motion.div
-        className="p-3 max-w-sm"
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.2 }}
-      >
-        {/* Hotel Image */}
-        <div className="relative mb-3 rounded-lg overflow-hidden">
-          <img
-            src={hotel.image_url}
-            alt={hotel.name}
-            className="w-full h-32 object-cover"
-            loading="lazy"
-          />
-          <div className="absolute top-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-sm">
-            {hotel.star_rating}★
-          </div>
-        </div>
-
-        {/* Hotel Info */}
-        <div className="space-y-2">
-          <h3 className="font-semibold text-lg leading-tight line-clamp-2">
-            {hotel.name}
-          </h3>
-          
-          <p className="text-sm text-gray-600 line-clamp-1">
-            {hotel.address}
-          </p>
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1">
-              <Star className="w-4 h-4 text-yellow-500 fill-current" />
-              <span className="text-sm font-medium">{hotel.rating}</span>
-              <span className="text-sm text-gray-500">
-                ({hotel.review_count} reviews)
-              </span>
-            </div>
-            
-            <div className="flex items-center gap-1">
-              <DollarSign className="w-4 h-4 text-green-600" />
-              <span className="text-sm font-semibold text-green-600">
-                ${normalizedPrice}
-              </span>
-            </div>
-          </div>
-          
-          <div className="text-sm text-gray-600">
-            {hotel.room_type}
-          </div>
-          
-          {/* Amenities */}
-          {hotel.amenities.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              {hotel.amenities.slice(0, 4).map((amenity, index) => (
-                <span
-                  key={index}
-                  className="px-2 py-1 bg-gray-100 text-xs rounded-full text-gray-700"
-                >
-                  {amenity}
-                </span>
-              ))}
-              {hotel.amenities.length > 4 && (
-                <span className="px-2 py-1 bg-gray-100 text-xs rounded-full text-gray-700">
-                  +{hotel.amenities.length - 4}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-      </motion.div>
-    </Popup>
-  );
-});
-
-HotelPopup.displayName = 'HotelPopup';
 
 // =============================================================================
 // MAIN HOTEL MAP COMPONENT
