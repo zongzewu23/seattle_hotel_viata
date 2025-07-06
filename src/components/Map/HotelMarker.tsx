@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useMemo } from 'react';
+import React, { useRef, useCallback, useMemo, useEffect } from 'react';
 import { Marker } from 'react-map-gl';
 import { motion } from 'framer-motion';
 import { MapPin } from 'lucide-react';
@@ -29,6 +29,23 @@ export const HotelMarker = React.memo<HotelMarkerProps>(({
   onHover,
 }) => {
   const markerRef = useRef<HTMLDivElement>(null);
+
+  // Debug logging for positioning issues
+  useEffect(() => {
+    if (isSelected && import.meta.env.DEV) {
+      console.log('🎯 Selected marker positioning debug:', {
+        hotel: hotel.name,
+        latitude: hotel.latitude,
+        longitude: hotel.longitude,
+        coordinatePrecision: {
+          lat: hotel.latitude.toString().split('.')[1]?.length || 0,
+          lng: hotel.longitude.toString().split('.')[1]?.length || 0,
+        },
+        anchor: 'center',
+        markerSize: isSelected ? 40 : isHovered ? 36 : 32,
+      });
+    }
+  }, [isSelected, hotel, isHovered]);
 
   const handleClick = useCallback((e: any) => {
     e.originalEvent?.stopPropagation();
@@ -61,7 +78,7 @@ export const HotelMarker = React.memo<HotelMarkerProps>(({
     <Marker
       latitude={hotel.latitude}
       longitude={hotel.longitude}
-      anchor="bottom"
+      anchor="center"
       onClick={handleClick}
     >
       <motion.div

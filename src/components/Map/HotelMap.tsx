@@ -81,8 +81,23 @@ export const HotelMap = React.memo<HotelMapProps>(({
 
   // Event handlers (must be declared before useMemo)
   const handleViewStateChange = useCallback((evt: ViewStateChangeEvent) => {
-    setViewState(evt.viewState);
-  }, []);
+    const newViewState = evt.viewState;
+    setViewState(newViewState);
+    
+    // Debug logging for zoom-related positioning issues
+    if (import.meta.env.DEV && Math.abs(newViewState.zoom - viewState.zoom) > 0.5) {
+      console.log('🗺️ Map zoom change debug:', {
+        oldZoom: viewState.zoom.toFixed(2),
+        newZoom: newViewState.zoom.toFixed(2),
+        center: {
+          lat: newViewState.latitude.toFixed(6),
+          lng: newViewState.longitude.toFixed(6),
+        },
+        mapLoaded: isMapLoaded,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, [viewState.zoom, isMapLoaded]);
 
   const handleHotelClick = useCallback((hotel: Hotel) => {
     onHotelSelect?.(hotel);

@@ -14,7 +14,7 @@ import { loadHotelData } from './utils/dataProcessor';
 // =============================================================================
 
 const APP_TITLE = import.meta.env.VITE_APP_TITLE || 'Seattle Hotel Explorer';
-const DEBUG_MODE = import.meta.env.VITE_DEBUG_MODE === 'true';
+const DEBUG_MODE = true; // Temporarily enabled to verify CSS loading status
 
 // =============================================================================
 // TYPES
