@@ -4,8 +4,8 @@ import Map, {
   GeolocateControl,
   Marker,
   Popup,
-  ViewStateChangeEvent,
-  MapRef,
+  type ViewStateChangeEvent,
+  type MapRef,
 } from 'react-map-gl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Star, DollarSign, Users } from 'lucide-react';
@@ -81,8 +81,8 @@ const HotelMarker = React.memo<HotelMarkerProps>(({
 }) => {
   const markerRef = useRef<HTMLDivElement>(null);
 
-  const handleClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleClick = useCallback((e: any) => {
+    e.originalEvent?.stopPropagation();
     onClick(hotel);
   }, [hotel, onClick]);
 
@@ -288,23 +288,7 @@ export const HotelMap = React.memo<HotelMapProps>(({
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
 
-  // Memoized hotel markers
-  const hotelMarkers = useMemo(() => {
-    if (!hotels || hotels.length === 0) return [];
-
-    return hotels.map((hotel) => (
-      <HotelMarker
-        key={hotel.hotel_id}
-        hotel={hotel}
-        isSelected={selectedHotel?.hotel_id === hotel.hotel_id}
-        isHovered={hoveredHotel?.hotel_id === hotel.hotel_id}
-        onClick={handleHotelClick}
-        onHover={handleHotelHover}
-      />
-    ));
-  }, [hotels, selectedHotel, hoveredHotel]);
-
-  // Event handlers
+  // Event handlers (must be declared before useMemo)
   const handleViewStateChange = useCallback((evt: ViewStateChangeEvent) => {
     setViewState(evt.viewState);
   }, []);
@@ -334,10 +318,32 @@ export const HotelMap = React.memo<HotelMapProps>(({
     setMapError(null);
   }, []);
 
-  const handleMapError = useCallback((error: Error) => {
-    setMapError(error.message);
+  const handleMapError = useCallback((error: any) => {
+    const errorMessage = error.error?.message || error.message || 'Map error';
+    setMapError(errorMessage);
     console.error('Map error:', error);
   }, []);
+
+  // Memoized hotel markers (after event handlers are declared)
+  const hotelMarkers = useMemo(() => {
+    if (!hotels || hotels.length === 0) return [];
+
+    // TODO: Implement clustering when enableClustering is true
+    if (enableClustering) {
+      // Clustering logic will be implemented here
+    }
+
+    return hotels.map((hotel) => (
+      <HotelMarker
+        key={hotel.hotel_id}
+        hotel={hotel}
+        isSelected={selectedHotel?.hotel_id === hotel.hotel_id}
+        isHovered={hoveredHotel?.hotel_id === hotel.hotel_id}
+        onClick={handleHotelClick}
+        onHover={handleHotelHover}
+      />
+    ));
+  }, [hotels, selectedHotel, hoveredHotel, handleHotelClick, handleHotelHover]);
 
   // Fly to selected hotel
   useEffect(() => {
