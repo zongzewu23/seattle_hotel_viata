@@ -142,18 +142,12 @@ function App() {
         stats={dataStats}
       />
 
-      {/* Selected Hotel Info Bar */}
-      <HotelInfoBar 
-        hotel={selectedHotel}
-        onClose={handleClearSelection}
-      />
-
-      {/* Map Container */}
+      {/* Map Container with Overlay Info Bar */}
       <motion.main
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.2 }}
-        className="flex-1 relative"
+        className={`flex-1 relative ${selectedHotel ? 'has-info-bar' : ''}`}
       >
         <HotelMap
           hotels={hotels}
@@ -162,6 +156,12 @@ function App() {
           onHotelHover={handleHotelHover}
           showPopup={true}
           className="w-full h-full"
+        />
+        
+        {/* Hotel Info Bar as Overlay */}
+        <HotelInfoBar 
+          hotel={selectedHotel}
+          onClose={handleClearSelection}
         />
       </motion.main>
 

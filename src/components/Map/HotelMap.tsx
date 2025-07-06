@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Users } from 'lucide-react';
 import type { Hotel, Coordinates } from '../../types/index';
 import { cn } from '../../utils/cn';
+import { refreshMapDisplay } from '../../utils/mapUtils';
 import HotelMarker from './HotelMarker';
 import HotelPopup from './HotelPopup';
 
@@ -71,6 +72,7 @@ export const HotelMap = React.memo<HotelMapProps>(({
   mapStyle = MAP_STYLE,
 }) => {
   const mapRef = useRef<MapRef>(null);
+  const animationTimeoutRef = useRef<number | null>(null);
   
   // Local state
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
@@ -78,6 +80,7 @@ export const HotelMap = React.memo<HotelMapProps>(({
   const [popupHotel, setPopupHotel] = useState<Hotel | null>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
 
   // Event handlers (must be declared before useMemo)
   const handleViewStateChange = useCallback((evt: ViewStateChangeEvent) => {
@@ -151,16 +154,44 @@ export const HotelMap = React.memo<HotelMapProps>(({
     ));
   }, [hotels, selectedHotel, hoveredHotel, handleHotelClick, handleHotelHover]);
 
-  // Fly to selected hotel
+  // Fly to selected hotel with consistent animation timing
   useEffect(() => {
-    if (selectedHotel && mapRef.current) {
+    if (selectedHotel && mapRef.current && !isAnimating) {
+      // Clear any existing animation timeout
+      if (animationTimeoutRef.current) {
+        clearTimeout(animationTimeoutRef.current);
+      }
+      
+      setIsAnimating(true);
+      
+      // Calculate target zoom level consistently
+      const targetZoom = Math.max(viewState.zoom, 14);
+      
       mapRef.current.flyTo({
         center: [selectedHotel.longitude, selectedHotel.latitude],
-        zoom: Math.max(viewState.zoom, 14),
-        duration: 1000,
+        zoom: targetZoom,
+        duration: 900, // Consistent 900ms duration
+        essential: true, // Prevent interruption by user interaction
       });
+      
+      // Reset animation state after completion
+      animationTimeoutRef.current = window.setTimeout(() => {
+        setIsAnimating(false);
+        animationTimeoutRef.current = null;
+        // Force map redraw for crisp rendering after animation
+        refreshMapDisplay(mapRef);
+      }, 950); // Slightly longer than animation duration
     }
-  }, [selectedHotel, viewState.zoom]);
+  }, [selectedHotel]); // Removed viewState.zoom to prevent re-triggering
+
+  // Cleanup animation timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (animationTimeoutRef.current) {
+        clearTimeout(animationTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Error boundary for missing token
   if (!MAPBOX_ACCESS_TOKEN) {
@@ -204,7 +235,13 @@ export const HotelMap = React.memo<HotelMapProps>(({
         onLoad={handleMapLoad}
         onError={handleMapError}
         mapboxAccessToken={MAPBOX_ACCESS_TOKEN}
-        style={{ width: '100%', height: '100%' }}
+        style={{ 
+          width: '100%', 
+          height: '100%',
+          imageRendering: 'crisp-edges',
+          transform: 'translateZ(0)', // Force hardware acceleration
+          backfaceVisibility: 'hidden' // Improve rendering quality
+        }}
         mapStyle={mapStyle}
         reuseMaps={true}
         preserveDrawingBuffer={true}
@@ -277,55 +314,5 @@ export const HotelMap = React.memo<HotelMapProps>(({
 });
 
 HotelMap.displayName = 'HotelMap';
-
-// =============================================================================
-// UTILITY FUNCTIONS
-// =============================================================================
-
-/**
- * Calculate map bounds for a set of hotels
- * @param hotels - Array of hotels
- * @returns Bounds object for map fitBounds
- */
-export function calculateHotelBounds(hotels: Hotel[]) {
-  if (hotels.length === 0) return null;
-
-  const lats = hotels.map(h => h.latitude);
-  const lngs = hotels.map(h => h.longitude);
-
-  return {
-    southwest: {
-      longitude: Math.min(...lngs),
-      latitude: Math.min(...lats),
-    },
-    northeast: {
-      longitude: Math.max(...lngs),
-      latitude: Math.max(...lats),
-    },
-  };
-}
-
-/**
- * Fit map to show all hotels
- * @param mapRef - Map reference
- * @param hotels - Array of hotels
- * @param padding - Padding around bounds
- */
-export function fitMapToHotels(
-  mapRef: React.RefObject<MapRef>,
-  hotels: Hotel[],
-  padding = 50
-) {
-  const bounds = calculateHotelBounds(hotels);
-  if (!bounds || !mapRef.current) return;
-
-  mapRef.current.fitBounds(
-    [
-      [bounds.southwest.longitude, bounds.southwest.latitude],
-      [bounds.northeast.longitude, bounds.northeast.latitude],
-    ],
-    { padding }
-  );
-}
 
 export default HotelMap; 

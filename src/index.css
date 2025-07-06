@@ -9,3 +9,38 @@
 .cluster-marker {
   @apply bg-secondary text-white rounded-full p-2 shadow-lg cursor-pointer transition-transform hover:scale-110;
 }
+
+/* Map controls positioning - move down only when info bar is present */
+.has-info-bar .mapboxgl-ctrl-top-right {
+  margin-top: 90px; /* Info bar height (~84px) + 6px padding */
+}
+
+/* Map display quality improvements */
+.mapboxgl-map {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.mapboxgl-canvas {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+/* Improve marker and popup rendering quality */
+.mapboxgl-marker,
+.mapboxgl-popup {
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
