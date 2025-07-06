@@ -13,10 +13,14 @@ const HotelInfoBar: React.FC<HotelInfoBarProps> = ({ hotel, onClose }) => {
     <AnimatePresence>
       {hotel && (
         <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          exit={{ opacity: 0, height: 0 }}
-          className="bg-blue-50 border-b border-blue-200 px-4 py-3 flex-shrink-0"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ 
+            opacity: 0,
+            transition: { duration: 0.15 }
+          }}
+          transition={{ duration: 0.25 }}
+          className="absolute top-0 left-0 right-0 z-10 bg-blue-50 border-b border-blue-200 px-4 py-3 shadow-lg"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
