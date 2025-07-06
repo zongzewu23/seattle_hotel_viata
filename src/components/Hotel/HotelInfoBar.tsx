@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star } from 'lucide-react';
+import { Star, MapPin } from 'lucide-react';
 import type { Hotel } from '../../types/index';
+import { calculateDistance, getUserLocation } from '../../utils/distanceUtils';
+import type { UserLocation } from '../../utils/distanceUtils';
 
 interface HotelInfoBarProps {
   hotel: Hotel | null;
@@ -9,6 +11,18 @@ interface HotelInfoBarProps {
 }
 
 const HotelInfoBar: React.FC<HotelInfoBarProps> = ({ hotel, onClose }) => {
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+
+  // Get user location on component mount
+  useEffect(() => {
+    const getLocation = async () => {
+      const location = await getUserLocation();
+      setUserLocation(location);
+    };
+    
+    getLocation();
+  }, []);
+
   return (
     <AnimatePresence>
       {hotel && (
@@ -36,6 +50,12 @@ const HotelInfoBar: React.FC<HotelInfoBarProps> = ({ hotel, onClose }) => {
                     <Star className="w-4 h-4 text-yellow-500 fill-current" />
                     <span>{hotel.rating}</span>
                   </div>
+                  {userLocation && (
+                    <div className="flex items-center space-x-1">
+                      <MapPin className="w-3 h-3" />
+                      <span>{calculateDistance(userLocation.latitude, userLocation.longitude, hotel.latitude, hotel.longitude)} mi</span>
+                    </div>
+                  )}
                   <span>{hotel.address}</span>
                 </div>
               </div>
