@@ -218,6 +218,7 @@ export const HotelMap = React.memo<HotelMapProps>(({
           zoom: debouncedZoom.toFixed(2),
           shouldCluster: shouldCluster(debouncedZoom, DEFAULT_CLUSTERING_CONFIG),
           timestamp: Date.now(),
+          clusterIds: clusters.map(c => c.id).join(', '),
         });
       }
 

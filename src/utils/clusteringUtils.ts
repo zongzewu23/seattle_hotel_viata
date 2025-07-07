@@ -179,8 +179,14 @@ export function groupHotelsByProximity(
     
     // Only create cluster if we have multiple hotels
     if (clusterHotels.length > 1) {
+      // Generate stable cluster ID based on hotel IDs (sorted for consistency)
+      const stableId = clusterHotels
+        .map(h => h.hotel_id)
+        .sort((a, b) => a - b)
+        .join('-');
+      
       clusters.push({
-        id: `cluster-${i}-${clusterHotels.length}`,
+        id: `cluster-${stableId}`,
         center: getClusterCenter(clusterHotels),
         hotels: clusterHotels,
         count: clusterHotels.length,
@@ -251,7 +257,9 @@ export function calculateClustersCached(
   viewport: MapViewport, 
   config: ClusteringConfig
 ): { clusters: HotelCluster[]; individualHotels: Hotel[] } {
-  const cacheKey = `${hotels.length}-${viewport.zoom.toFixed(1)}-${config.clusterRadius}`;
+  // Create more stable cache key that includes hotel positions
+  const hotelPositions = hotels.map(h => `${h.hotel_id}:${h.latitude.toFixed(4)},${h.longitude.toFixed(4)}`).join('|');
+  const cacheKey = `${hotelPositions}-${viewport.zoom.toFixed(1)}-${config.clusterRadius}`;
   
   if (clusterCache.has(cacheKey)) {
     return clusterCache.get(cacheKey)!;
