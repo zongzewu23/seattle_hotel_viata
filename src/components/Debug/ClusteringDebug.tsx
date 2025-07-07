@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Settings, MapPin, Users, Star, Eye } from 'lucide-react';
-import type { Hotel, HotelCluster, MapViewport } from '../../types/index';
+import type { Hotel, MapViewport } from '../../types/index';
 import { cn } from '../../utils/cn';
 import { 
   calculateClustersCached, 
