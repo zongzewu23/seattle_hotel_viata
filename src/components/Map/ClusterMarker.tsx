@@ -53,6 +53,16 @@ export const ClusterMarker = React.memo<ClusterMarkerProps>(({
     return 'min-w-[20px] h-5';
   }, [category]);
 
+  // Debug lifecycle for animation jitter investigation
+  if (import.meta.env.DEV) {
+    console.log('🎯 Cluster lifecycle:', {
+      clusterId: cluster.id,
+      action: 'render',
+      count: cluster.count,
+      timestamp: Date.now()
+    });
+  }
+
   return (
     <Marker
       latitude={cluster.center.latitude}
@@ -62,24 +72,26 @@ export const ClusterMarker = React.memo<ClusterMarkerProps>(({
     >
       <motion.div
         className={cn(
-          'cursor-pointer transition-all duration-300',
-          'hover:scale-110 active:scale-95',
+          'cursor-pointer',
           'relative flex items-center justify-center',
           className
         )}
-        initial={{ scale: 0, opacity: 0 }}
+        initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0, opacity: 0 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-        whileHover={{ scale: 1.1 }}
+        exit={{ scale: 0.8, opacity: 0 }}
+        transition={{ 
+          type: 'tween', 
+          duration: 0.2, 
+          ease: 'easeOut' 
+        }}
+        whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
       >
         {/* Main cluster circle */}
-        <motion.div
+        <div
           className={cn(
             'rounded-full border-3 border-white shadow-lg',
             'flex items-center justify-center',
-            'transition-all duration-300',
             'backdrop-blur-sm'
           )}
           style={{
@@ -90,10 +102,6 @@ export const ClusterMarker = React.memo<ClusterMarkerProps>(({
               ? '0 8px 32px rgba(0, 0, 0, 0.2), 0 0 0 4px rgba(255, 255, 255, 0.3)'
               : '0 4px 16px rgba(0, 0, 0, 0.15)',
           }}
-          animate={{
-            scale: isHovered ? 1.1 : 1,
-          }}
-          transition={{ duration: 0.2 }}
         >
           {/* Hotel count */}
           <div className={cn('flex flex-col items-center', textSize)}>
@@ -102,10 +110,10 @@ export const ClusterMarker = React.memo<ClusterMarkerProps>(({
               {cluster.count}
             </span>
           </div>
-        </motion.div>
+        </div>
 
         {/* Rating badge */}
-        <motion.div
+        <div
           className={cn(
             'absolute -top-1 -right-1',
             badgeSize,
@@ -117,19 +125,16 @@ export const ClusterMarker = React.memo<ClusterMarkerProps>(({
             borderColor: clusterColor,
             color: clusterColor,
           }}
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ delay: 0.1, type: 'spring', stiffness: 400, damping: 20 }}
         >
           <Star className="w-2.5 h-2.5 mr-0.5" fill="currentColor" />
           <span className="leading-none">
             {cluster.avgRating.toFixed(1)}
           </span>
-        </motion.div>
+        </div>
 
         {/* Price range indicator (optional, for large clusters) */}
         {category === 'large' && cluster.priceRange.min !== cluster.priceRange.max && (
-          <motion.div
+          <div
             className={cn(
               'absolute -bottom-1 -left-1',
               'min-w-[36px] h-5 px-1',
@@ -141,30 +146,23 @@ export const ClusterMarker = React.memo<ClusterMarkerProps>(({
               borderColor: clusterColor,
               color: clusterColor,
             }}
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.2, type: 'spring', stiffness: 400, damping: 20 }}
           >
             <span className="leading-none">
               ${Math.round(cluster.priceRange.min)}-${Math.round(cluster.priceRange.max)}
             </span>
-          </motion.div>
+          </div>
         )}
 
         {/* Hover effect ring */}
         {isHovered && (
-          <motion.div
-            className="absolute inset-0 rounded-full border-2 border-white"
+          <div
+            className="absolute inset-0 rounded-full border-2 border-white opacity-60"
             style={{
               width: displaySize + 8,
               height: displaySize + 8,
               marginLeft: -4,
               marginTop: -4,
             }}
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 0.6 }}
-            exit={{ scale: 0.8, opacity: 0 }}
-            transition={{ duration: 0.2 }}
           />
         )}
       </motion.div>

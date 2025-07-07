@@ -81,6 +81,18 @@ export const HotelMarker = React.memo<HotelMarkerProps>(({
     return 32;
   }, [isSelected, isHovered]);
 
+  // Debug lifecycle for animation jitter investigation
+  if (import.meta.env.DEV) {
+    console.log('🎯 Hotel marker lifecycle:', {
+      hotelId: hotel.hotel_id,
+      hotelName: hotel.name,
+      action: 'render',
+      isSelected,
+      isHovered,
+      timestamp: Date.now()
+    });
+  }
+
   return (
     <Marker
       latitude={hotel.latitude}
@@ -91,24 +103,27 @@ export const HotelMarker = React.memo<HotelMarkerProps>(({
       <motion.div
         ref={markerRef}
         className={cn(
-          'cursor-pointer transition-all duration-200',
-          'hover:scale-110 active:scale-95',
+          'cursor-pointer',
           isSelected && 'z-10',
           isHovered && 'z-20'
         )}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-        whileHover={{ scale: 1.1 }}
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.8, opacity: 0 }}
+        transition={{ 
+          type: 'tween', 
+          duration: 0.2, 
+          ease: 'easeOut' 
+        }}
+        whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
       >
         <div
           className={cn(
             'relative flex items-center justify-center',
-            'rounded-full border-2 border-white shadow-lg',
-            'transition-all duration-200'
+            'rounded-full border-2 border-white shadow-lg'
           )}
           style={{
             width: markerSize,

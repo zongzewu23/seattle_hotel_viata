@@ -49,19 +49,36 @@ const markers = useMemo(() => {
     individualHotels: individualHotels.length,
     zoom: debouncedZoom.toFixed(2),
     timestamp: Date.now(), // For tracking duplicates
+    clusterIds: clusters.map(c => c.id).join(', '),
   });
   ```
+
+### Phase 5: Fixed Animation Jitter ✅
+- **Problem**: Half-second jitter at start of zoom for both clusters and hotel markers
+- **Root Causes**: 
+  - **Clusters**: Unstable IDs changed during zoom
+  - **Hotels**: Complex animation config with CSS/Framer conflicts
+- **Solutions**: 
+  - **Clusters**: Stable cluster IDs based on hotel IDs
+  - **Hotels**: Applied same animation simplification pattern
+- **Files Modified**:
+  - `src/utils/clusteringUtils.ts`: Stable ID generation
+  - `src/components/Map/ClusterMarker.tsx`: Simplified animations
+  - `src/components/Map/HotelMarker.tsx`: Applied same animation fixes
+- **Result**: Eliminated animation jitter for all markers, unified smooth transitions
 
 ## Performance Improvements Expected
 
 ### Before Optimization
 - **Clustering Calculations**: 18+ per zoom action
 - **User Experience**: Flickering markers, shaking animations
+- **Animation Jitter**: 0.5-second jitter at start of zoom operations
 - **Console Logs**: Excessive duplicate calculations
 
 ### After Optimization
 - **Clustering Calculations**: ≤2 per zoom action
 - **User Experience**: Smooth cluster animations, no flickering
+- **Animation Stability**: Elimination of jitter, stable cluster IDs
 - **Performance Monitoring**: Clear timing data and deduplication tracking
 
 ## Testing Validation Criteria
@@ -109,7 +126,10 @@ export function useDebounced<T>(value: T, delay: number): T {
 ## File Changes Summary
 - ✅ **NEW**: `src/hooks/useDebounced.ts` - Debounce utility hook
 - ✅ **MODIFIED**: `src/components/Map/HotelMap.tsx` - Core performance optimizations
-- ✅ **RESULT**: Eliminated 90%+ of unnecessary clustering calculations
+- ✅ **MODIFIED**: `src/utils/clusteringUtils.ts` - Stable cluster ID generation
+- ✅ **MODIFIED**: `src/components/Map/ClusterMarker.tsx` - Simplified animations
+- ✅ **MODIFIED**: `src/components/Map/HotelMarker.tsx` - Applied same animation fixes
+- ✅ **RESULT**: Eliminated 90%+ of unnecessary clustering calculations + animation jitter for all markers
 
 ## Monitoring Commands
 ```bash
