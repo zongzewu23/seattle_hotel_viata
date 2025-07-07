@@ -1,4 +1,5 @@
 import type { Hotel, HotelCluster, ClusteringConfig, MapViewport, BoundingBox, Coordinates } from '../types/index';
+import { getClusterColor as getUnifiedClusterColor } from './colorUtils';
 
 // =============================================================================
 // CLUSTERING CONFIGURATION
@@ -279,11 +280,12 @@ export function clearClusterCache(): void {
 
 /**
  * Gets cluster color based on average rating
+ * @deprecated Use getClusterColor from colorUtils instead for unified color system
  */
 export function getClusterColor(avgRating: number): string {
-  if (avgRating >= 8.0) return '#10b981'; // green-500
-  if (avgRating >= 6.0) return '#f59e0b'; // amber-500
-  return '#6b7280'; // gray-500
+  // Re-export from unified color system to maintain backward compatibility
+  return getUnifiedClusterColor(avgRating);
+
 }
 
 /**

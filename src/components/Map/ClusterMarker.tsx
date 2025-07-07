@@ -4,7 +4,8 @@ import { motion } from 'framer-motion';
 import { Users, Star } from 'lucide-react';
 import type { HotelCluster } from '../../types/index';
 import { cn } from '../../utils/cn';
-import { getClusterColor, getClusterSize } from '../../utils/clusteringUtils';
+import { getClusterColor } from '../../utils/colorUtils';
+import { getClusterSize } from '../../utils/clusteringUtils';
 
 // =============================================================================
 // INTERFACES
