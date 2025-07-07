@@ -7,11 +7,18 @@ import Map, {
 } from 'react-map-gl';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Users } from 'lucide-react';
-import type { Hotel, Coordinates } from '../../types/index';
+import type { Hotel, Coordinates, HotelCluster, MapViewport } from '../../types/index';
 import { cn } from '../../utils/cn';
 import { refreshMapDisplay } from '../../utils/mapUtils';
+import { 
+  calculateClustersCached, 
+  DEFAULT_CLUSTERING_CONFIG, 
+  shouldCluster,
+  clearClusterCache 
+} from '../../utils/clusteringUtils';
 import HotelMarker from './HotelMarker';
 import HotelPopup from './HotelPopup';
+import ClusterMarker from './ClusterMarker';
 
 // =============================================================================
 // MAPBOX CONFIGURATION
@@ -53,6 +60,7 @@ export interface HotelMapProps {
   showPopup?: boolean;
   enableClustering?: boolean;
   mapStyle?: string;
+  onMapViewStateChange?: (viewState: { latitude: number; longitude: number; zoom: number }) => void;
 }
 
 
@@ -70,6 +78,7 @@ export const HotelMap = React.memo<HotelMapProps>(({
   showPopup = true,
   enableClustering = false,
   mapStyle = MAP_STYLE,
+  onMapViewStateChange,
 }) => {
   const mapRef = useRef<MapRef>(null);
   const animationTimeoutRef = useRef<number | null>(null);
@@ -87,6 +96,13 @@ export const HotelMap = React.memo<HotelMapProps>(({
     const newViewState = evt.viewState;
     setViewState(newViewState);
     
+    // Notify parent about view state changes
+    onMapViewStateChange?.({
+      latitude: newViewState.latitude,
+      longitude: newViewState.longitude,
+      zoom: newViewState.zoom,
+    });
+    
     // Debug logging for zoom-related positioning issues
     if (import.meta.env.DEV && Math.abs(newViewState.zoom - viewState.zoom) > 0.5) {
       console.log('🗺️ Map zoom change debug:', {
@@ -100,7 +116,7 @@ export const HotelMap = React.memo<HotelMapProps>(({
         timestamp: new Date().toISOString(),
       });
     }
-  }, [viewState.zoom, isMapLoaded]);
+  }, [viewState.zoom, isMapLoaded, onMapViewStateChange]);
 
   const handleHotelClick = useCallback((hotel: Hotel) => {
     onHotelSelect?.(hotel);
@@ -133,15 +149,88 @@ export const HotelMap = React.memo<HotelMapProps>(({
     console.error('Map error:', error);
   }, []);
 
-  // Memoized hotel markers (after event handlers are declared)
-  const hotelMarkers = useMemo(() => {
+  const handleClusterClick = useCallback((cluster: HotelCluster) => {
+    if (mapRef.current) {
+      // Calculate padding based on cluster size
+      const padding = Math.max(50, cluster.count * 2);
+      
+      // Zoom to cluster bounds with animation
+      mapRef.current.fitBounds([
+        [cluster.bounds.west, cluster.bounds.south],
+        [cluster.bounds.east, cluster.bounds.north]
+      ], { 
+        padding: { top: padding, bottom: padding, left: padding, right: padding },
+        duration: 800,
+        essential: true,
+      });
+    }
+  }, []);
+
+  // Memoized hotel markers and clusters (after event handlers are declared)
+  const markers = useMemo(() => {
     if (!hotels || hotels.length === 0) return [];
 
-    // TODO: Implement clustering when enableClustering is true
-    if (enableClustering) {
-      // Clustering logic will be implemented here
+    // Use clustering if enabled and should cluster at current zoom level
+    if (enableClustering && shouldCluster(viewState.zoom, DEFAULT_CLUSTERING_CONFIG)) {
+      const viewport: MapViewport = {
+        bounds: {
+          northeast: {
+            latitude: viewState.latitude + 0.1,
+            longitude: viewState.longitude + 0.1,
+          },
+          southwest: {
+            latitude: viewState.latitude - 0.1,
+            longitude: viewState.longitude - 0.1,
+          },
+        },
+        center: {
+          latitude: viewState.latitude,
+          longitude: viewState.longitude,
+        },
+        zoom: viewState.zoom,
+      };
+
+      const { clusters, individualHotels } = calculateClustersCached(
+        hotels,
+        viewport,
+        DEFAULT_CLUSTERING_CONFIG
+      );
+
+      // Debug logging for clustering
+      if (import.meta.env.DEV && (clusters.length > 0 || individualHotels.length !== hotels.length)) {
+        console.log('🔗 Clustering debug:', {
+          totalHotels: hotels.length,
+          clusters: clusters.length,
+          individualHotels: individualHotels.length,
+          zoom: viewState.zoom.toFixed(2),
+          shouldCluster: shouldCluster(viewState.zoom, DEFAULT_CLUSTERING_CONFIG),
+        });
+      }
+
+      return [
+        // Render cluster markers
+        ...clusters.map(cluster => (
+          <ClusterMarker
+            key={cluster.id}
+            cluster={cluster}
+            onClusterClick={handleClusterClick}
+          />
+        )),
+        // Render individual hotel markers
+        ...individualHotels.map(hotel => (
+          <HotelMarker
+            key={hotel.hotel_id}
+            hotel={hotel}
+            isSelected={selectedHotel?.hotel_id === hotel.hotel_id}
+            isHovered={hoveredHotel?.hotel_id === hotel.hotel_id}
+            onClick={handleHotelClick}
+            onHover={handleHotelHover}
+          />
+        )),
+      ];
     }
 
+    // No clustering - render all hotels individually
     return hotels.map((hotel) => (
       <HotelMarker
         key={hotel.hotel_id}
@@ -152,7 +241,7 @@ export const HotelMap = React.memo<HotelMapProps>(({
         onHover={handleHotelHover}
       />
     ));
-  }, [hotels, selectedHotel, hoveredHotel, handleHotelClick, handleHotelHover]);
+  }, [hotels, selectedHotel, hoveredHotel, handleHotelClick, handleHotelHover, handleClusterClick, viewState.zoom, enableClustering]);
 
   // Fly to selected hotel with consistent animation timing
   useEffect(() => {
@@ -190,6 +279,13 @@ export const HotelMap = React.memo<HotelMapProps>(({
       if (animationTimeoutRef.current) {
         clearTimeout(animationTimeoutRef.current);
       }
+    };
+  }, []);
+
+  // Cleanup cluster cache on unmount
+  useEffect(() => {
+    return () => {
+      clearClusterCache();
     };
   }, []);
 
@@ -266,9 +362,9 @@ export const HotelMap = React.memo<HotelMapProps>(({
           showUserLocation={true}
         />
 
-        {/* Hotel Markers */}
+        {/* Hotel Markers and Clusters */}
         <AnimatePresence>
-          {isMapLoaded && hotelMarkers}
+          {isMapLoaded && markers}
         </AnimatePresence>
 
         {/* Hotel Popup */}

@@ -6,6 +6,7 @@ import ErrorScreen from './components/UI/ErrorScreen';
 import AppHeader from './components/Layout/AppHeader';
 import HotelInfoBar from './components/Hotel/HotelInfoBar';
 import DebugPanel from './components/Debug/DebugPanel';
+import ClusteringDebug from './components/Debug/ClusteringDebug';
 import type { Hotel } from './types/index';
 import { loadHotelData } from './utils/dataProcessor';
 
@@ -38,6 +39,13 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dataStats, setDataStats] = useState<DataStats | null>(null);
+  const [mapViewState, setMapViewState] = useState({
+    latitude: 47.6089,
+    longitude: -122.3345,
+    zoom: 12.5,
+  });
+  const [showClusteringDebug, setShowClusteringDebug] = useState(false);
+  const [enableClustering, setEnableClustering] = useState(true);
 
   // Data loading effect
   useEffect(() => {
@@ -122,6 +130,14 @@ function App() {
     window.location.reload();
   }, []);
 
+  const handleMapViewStateChange = useCallback((newViewState: { latitude: number; longitude: number; zoom: number }) => {
+    setMapViewState(newViewState);
+  }, []);
+
+  const handleToggleClusteringDebug = useCallback(() => {
+    setShowClusteringDebug(prev => !prev);
+  }, []);
+
   // Loading state
   if (isLoading) {
     return <LoadingScreen />;
@@ -155,6 +171,8 @@ function App() {
           onHotelSelect={handleHotelSelect}
           onHotelHover={handleHotelHover}
           showPopup={true}
+          enableClustering={enableClustering}
+          onMapViewStateChange={handleMapViewStateChange}
           className="w-full h-full"
         />
         
@@ -171,6 +189,15 @@ function App() {
         selectedHotel={selectedHotel}
         hoveredHotel={hoveredHotel}
         debugMode={DEBUG_MODE}
+      />
+
+      {/* Clustering Debug */}
+      <ClusteringDebug
+        hotels={hotels}
+        viewState={mapViewState}
+        enableClustering={enableClustering}
+        isVisible={showClusteringDebug}
+        onToggleVisibility={handleToggleClusteringDebug}
       />
     </div>
   );
