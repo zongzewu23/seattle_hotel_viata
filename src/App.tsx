@@ -49,28 +49,65 @@ function App() {
   const [showClusteringDebug, setShowClusteringDebug] = useState(false);
   const [enableClustering] = useState(true);
 
-  // Filter state
-  const [filters, setFilters] = useState<HotelFilters>({});
+  // Filter state - Enhanced with preview functionality
+  const [pendingFilters, setPendingFilters] = useState<HotelFilters>({});
+  const [appliedFilters, setAppliedFilters] = useState<HotelFilters>({});
+  const [originalFilters, setOriginalFilters] = useState<HotelFilters>({});
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+  const [showBackdrop, setShowBackdrop] = useState(true);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isApplyingFilters, setIsApplyingFilters] = useState(false);
 
-  // Apply filters to hotels
+  // Apply filters to hotels (only when appliedFilters changes)
   const filteredHotels = useMemo(() => {
     if (hotels.length === 0) return [];
-    return filterHotels(hotels, filters);
-  }, [hotels, filters]);
+    return filterHotels(hotels, appliedFilters);
+  }, [hotels, appliedFilters]);
 
-  // Count active filters
+  // Calculate preview count for pending filters
+  const previewCount = useMemo(() => {
+    if (hotels.length === 0) return 0;
+    return filterHotels(hotels, pendingFilters).length;
+  }, [hotels, pendingFilters]);
+
+  // Count active applied filters (for badge display)
   const activeFiltersCount = useMemo(() => {
     let count = 0;
     
-    if (filters.priceRange) count++;
-    if (filters.ratingRange) count++;
-    if (filters.starRating && filters.starRating.length > 0) count++;
-    if (filters.amenities && filters.amenities.length > 0) count += filters.amenities.length;
-    if (filters.searchQuery && filters.searchQuery.trim()) count++;
+    if (appliedFilters.priceRange) count++;
+    if (appliedFilters.ratingRange) count++;
+    if (appliedFilters.starRating && appliedFilters.starRating.length > 0) count++;
+    if (appliedFilters.amenities && appliedFilters.amenities.length > 0) count += appliedFilters.amenities.length;
+    if (appliedFilters.searchQuery && appliedFilters.searchQuery.trim()) count++;
     
     return count;
-  }, [filters]);
+  }, [appliedFilters]);
+
+  // Check if there are pending changes
+  const hasPendingChanges = useMemo(() => {
+    return JSON.stringify(pendingFilters) !== JSON.stringify(appliedFilters);
+  }, [pendingFilters, appliedFilters]);
+
+  // Check if pending filters are empty
+  const hasPendingFilters = useMemo(() => {
+    return Boolean(
+      pendingFilters.priceRange ||
+      pendingFilters.ratingRange ||
+      (pendingFilters.starRating && pendingFilters.starRating.length > 0) ||
+      (pendingFilters.amenities && pendingFilters.amenities.length > 0) ||
+      (pendingFilters.searchQuery && pendingFilters.searchQuery.trim())
+    );
+  }, [pendingFilters]);
+
+  // Check if filters have changed from original baseline
+  const hasFilterChanges = useMemo(() => {
+    return JSON.stringify(pendingFilters) !== JSON.stringify(originalFilters);
+  }, [pendingFilters, originalFilters]);
+
+  // Conditional backdrop visibility
+  const shouldShowBackdrop = useMemo(() => {
+    return isFilterPanelOpen && showBackdrop && !isPreviewing;
+  }, [isFilterPanelOpen, showBackdrop, isPreviewing]);
 
   // Data loading effect
   useEffect(() => {
@@ -163,22 +200,95 @@ function App() {
     setShowClusteringDebug(prev => !prev);
   }, []);
 
-  // Filter handlers
+  // Filter panel handlers
   const handleOpenFilterPanel = useCallback(() => {
+    // Save current applied filters as baseline when opening panel
+    setOriginalFilters(appliedFilters);
     setIsFilterPanelOpen(true);
-  }, []);
+    setShowBackdrop(true);
+    setIsPreviewing(false);
+  }, [appliedFilters]);
 
   const handleCloseFilterPanel = useCallback(() => {
     setIsFilterPanelOpen(false);
-  }, []);
+    setShowBackdrop(false);
+    setIsPreviewing(false);
+    // Reset pending filters to applied filters when closing without applying
+    setPendingFilters(appliedFilters);
+  }, [appliedFilters]);
 
-  const handleFiltersChange = useCallback((newFilters: HotelFilters) => {
-    setFilters(newFilters);
+  // Handle pending filter changes (update UI immediately, don't filter hotels)
+  const handlePendingFiltersChange = useCallback((newFilters: HotelFilters) => {
+    setPendingFilters(newFilters);
     if (DEBUG_MODE) {
-      console.log('Filters changed:', newFilters);
-      console.log('Filtered hotels count:', filterHotels(hotels, newFilters).length);
+      console.log('Pending filters changed:', newFilters);
+      console.log('Preview count:', filterHotels(hotels, newFilters).length);
     }
   }, [hotels]);
+
+  // Preview functionality
+  const handlePreview = useCallback(() => {
+    if (!isPreviewing) {
+      // Enter preview mode
+      setAppliedFilters(pendingFilters);
+      setShowBackdrop(false);
+      setIsPreviewing(true);
+      
+      if (DEBUG_MODE) {
+        console.log('Preview mode activated:', pendingFilters);
+      }
+    } else {
+      // Exit preview mode
+      setAppliedFilters(originalFilters);
+      setShowBackdrop(true);
+      setIsPreviewing(false);
+      
+      if (DEBUG_MODE) {
+        console.log('Preview mode deactivated, reverted to:', originalFilters);
+      }
+    }
+  }, [isPreviewing, pendingFilters, originalFilters]);
+
+  // Apply pending filters (filter hotels and close panel)
+  const handleApplyFilters = useCallback(async () => {
+    setIsApplyingFilters(true);
+    
+    // Add a small delay for visual feedback
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Apply filters permanently
+    setAppliedFilters(pendingFilters);
+    setOriginalFilters(pendingFilters);
+    setIsApplyingFilters(false);
+    
+    // Close filter panel completely
+    setIsFilterPanelOpen(false);
+    setShowBackdrop(false);
+    setIsPreviewing(false);
+    
+    if (DEBUG_MODE) {
+      console.log('Filters applied and panel closed:', pendingFilters);
+      console.log('Filtered hotels count:', filterHotels(hotels, pendingFilters).length);
+    }
+  }, [pendingFilters, hotels]);
+
+  // Clear all filters
+  const handleClearAllFilters = useCallback(() => {
+    setPendingFilters({});
+    setAppliedFilters({});
+    setOriginalFilters({});
+    
+    if (DEBUG_MODE) {
+      console.log('All filters cleared');
+    }
+  }, []);
+
+  // Reset pending filters to applied filters (cancel changes)
+  const handleResetPendingFilters = useCallback(() => {
+    setPendingFilters(appliedFilters);
+    setIsPreviewing(false);
+    setShowBackdrop(true);
+  }, [appliedFilters]);
 
   // Loading state
   if (isLoading) {
@@ -249,9 +359,21 @@ function App() {
         isOpen={isFilterPanelOpen}
         onClose={handleCloseFilterPanel}
         hotels={hotels}
-        filters={filters}
-        onFiltersChange={handleFiltersChange}
-        filteredHotelsCount={filteredHotels.length}
+        pendingFilters={pendingFilters}
+        appliedFilters={appliedFilters}
+        originalFilters={originalFilters}
+        onPendingFiltersChange={handlePendingFiltersChange}
+        onApplyFilters={handleApplyFilters}
+        onClearAllFilters={handleClearAllFilters}
+        onResetPendingFilters={handleResetPendingFilters}
+        onPreview={handlePreview}
+        previewCount={previewCount}
+        isApplyingFilters={isApplyingFilters}
+        hasPendingChanges={hasPendingChanges}
+        hasPendingFilters={hasPendingFilters}
+        hasFilterChanges={hasFilterChanges}
+        isPreviewing={isPreviewing}
+        showBackdrop={shouldShowBackdrop}
       />
 
       {/* Debug Panel */}

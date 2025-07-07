@@ -34,6 +34,13 @@ const clamp = (value: number, min: number, max: number): number => {
   return Math.min(Math.max(value, min), max);
 };
 
+const parsePrice = (priceString: string): number => {
+  // Remove all non-numeric characters except decimal point
+  const cleanedString = priceString.replace(/[^0-9.]/g, '');
+  const parsed = parseFloat(cleanedString);
+  return isNaN(parsed) ? 0 : parsed;
+};
+
 // =============================================================================
 // MAIN COMPONENT
 // =============================================================================
@@ -48,15 +55,24 @@ export default function PriceRangeSlider({
   disabled = false
 }: PriceRangeSliderProps) {
   const [isDragging, setIsDragging] = useState<'min' | 'max' | null>(null);
-  const [inputValues, setInputValues] = useState<[string, string]>([
-    value[0].toString(),
-    value[1].toString()
-  ]);
+  
+  // Separate state for input display strings and actual values
+  const [inputState, setInputState] = useState({
+    minInput: value[0].toString(),
+    maxInput: value[1].toString(),
+    isMinFocused: false,
+    isMaxFocused: false
+  });
+
   const sliderRef = useRef<HTMLDivElement>(null);
 
-  // Update input values when prop values change
+  // Update input display when prop values change (but only if not focused)
   useEffect(() => {
-    setInputValues([value[0].toString(), value[1].toString()]);
+    setInputState(prev => ({
+      ...prev,
+      minInput: prev.isMinFocused ? prev.minInput : value[0].toString(),
+      maxInput: prev.isMaxFocused ? prev.maxInput : value[1].toString()
+    }));
   }, [value]);
 
   // Calculate percentage positions for the slider
@@ -106,34 +122,60 @@ export default function PriceRangeSlider({
     document.addEventListener('mouseup', handleMouseUp);
   }, [disabled, min, max, step, value, onChange]);
 
-  // Handle input changes
-  const handleInputChange = useCallback((index: 0 | 1, inputValue: string) => {
-    const newInputValues: [string, string] = [...inputValues];
-    newInputValues[index] = inputValue;
-    setInputValues(newInputValues);
+  // Handle input focus
+  const handleInputFocus = useCallback((type: 'min' | 'max') => {
+    setInputState(prev => ({
+      ...prev,
+      [`is${type === 'min' ? 'Min' : 'Max'}Focused`]: true
+    }));
+  }, []);
+
+  // Handle input changes (allow free typing)
+  const handleInputChange = useCallback((type: 'min' | 'max', inputValue: string) => {
+    if (disabled) return;
     
-    // Parse and validate the input
-    const numValue = parseFloat(inputValue.replace(/[^0-9.]/g, ''));
-    if (isNaN(numValue)) return;
+    setInputState(prev => ({
+      ...prev,
+      [`${type}Input`]: inputValue
+    }));
+  }, [disabled]);
+
+  // Handle input blur (validate and apply)
+  const handleInputBlur = useCallback((type: 'min' | 'max') => {
+    if (disabled) return;
     
-    const steppedValue = Math.round(numValue / step) * step;
-    const newValue: [number, number] = [...value];
+    const inputValue = type === 'min' ? inputState.minInput : inputState.maxInput;
+    const parsedValue = parsePrice(inputValue);
+    const steppedValue = Math.round(parsedValue / step) * step;
     
-    if (index === 0) {
-      newValue[0] = clamp(steppedValue, min, value[1] - step);
+    let finalValue: number;
+    let newValues: [number, number];
+    
+    if (type === 'min') {
+      finalValue = clamp(steppedValue, min, value[1] - step);
+      newValues = [finalValue, value[1]];
     } else {
-      newValue[1] = clamp(steppedValue, value[0] + step, max);
+      finalValue = clamp(steppedValue, value[0] + step, max);
+      newValues = [value[0], finalValue];
     }
     
-    onChange(newValue);
-  }, [inputValues, value, min, max, step, onChange]);
+    // Update input display with validated value
+    setInputState(prev => ({
+      ...prev,
+      [`${type}Input`]: finalValue.toString(),
+      [`is${type === 'min' ? 'Min' : 'Max'}Focused`]: false
+    }));
+    
+    // Apply the change
+    onChange(newValues);
+  }, [disabled, inputState.minInput, inputState.maxInput, min, max, step, value, onChange]);
 
-  // Handle input blur (format the display value)
-  const handleInputBlur = useCallback((index: 0 | 1) => {
-    const newInputValues: [string, string] = [...inputValues];
-    newInputValues[index] = value[index].toString();
-    setInputValues(newInputValues);
-  }, [inputValues, value]);
+  // Handle Enter key in inputs
+  const handleInputKeyDown = useCallback((_type: 'min' | 'max', event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      event.currentTarget.blur();
+    }
+  }, []);
 
   // Handle track click
   const handleTrackClick = useCallback((event: React.MouseEvent) => {
@@ -169,9 +211,11 @@ export default function PriceRangeSlider({
             <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
-              value={inputValues[0]}
-              onChange={(e) => handleInputChange(0, e.target.value)}
-              onBlur={() => handleInputBlur(0)}
+              value={inputState.minInput}
+              onChange={(e) => handleInputChange('min', e.target.value)}
+              onFocus={() => handleInputFocus('min')}
+              onBlur={() => handleInputBlur('min')}
+              onKeyDown={(e) => handleInputKeyDown('min', e)}
               disabled={disabled}
               className={cn(
                 "w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-lg",
@@ -196,9 +240,11 @@ export default function PriceRangeSlider({
             <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
-              value={inputValues[1]}
-              onChange={(e) => handleInputChange(1, e.target.value)}
-              onBlur={() => handleInputBlur(1)}
+              value={inputState.maxInput}
+              onChange={(e) => handleInputChange('max', e.target.value)}
+              onFocus={() => handleInputFocus('max')}
+              onBlur={() => handleInputBlur('max')}
+              onKeyDown={(e) => handleInputKeyDown('max', e)}
               disabled={disabled}
               className={cn(
                 "w-full pl-10 pr-3 py-2 text-sm border border-gray-300 rounded-lg",
