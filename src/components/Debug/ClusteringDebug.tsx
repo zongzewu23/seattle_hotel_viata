@@ -7,9 +7,9 @@ import {
   calculateClustersCached, 
   DEFAULT_CLUSTERING_CONFIG, 
   shouldCluster,
-  getClusterColor,
   getClusterSize,
 } from '../../utils/clusteringUtils';
+import { getClusterColor } from '../../utils/colorUtils';
 
 // =============================================================================
 // INTERFACES

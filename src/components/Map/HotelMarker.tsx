@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { MapPin } from 'lucide-react';
 import type { Hotel } from '../../types/index';
 import { cn } from '../../utils/cn';
+import { getHotelMarkerColor } from '../../utils/colorUtils';
 
 // =============================================================================
 // INTERFACES
@@ -30,20 +31,30 @@ export const HotelMarker = React.memo<HotelMarkerProps>(({
 }) => {
   const markerRef = useRef<HTMLDivElement>(null);
 
-  // Debug logging for positioning issues
+  // Debug logging for positioning and color issues
   useEffect(() => {
-    if (isSelected && import.meta.env.DEV) {
-      console.log('🎯 Selected marker positioning debug:', {
-        hotel: hotel.name,
-        latitude: hotel.latitude,
-        longitude: hotel.longitude,
-        coordinatePrecision: {
-          lat: hotel.latitude.toString().split('.')[1]?.length || 0,
-          lng: hotel.longitude.toString().split('.')[1]?.length || 0,
-        },
-        anchor: 'center',
-        markerSize: isSelected ? 40 : isHovered ? 36 : 32,
-      });
+    if (import.meta.env.DEV) {
+      const currentColor = getHotelMarkerColor(hotel.rating, isSelected, isHovered);
+      
+      if (isSelected) {
+        console.log('🎯 Selected marker debug:', {
+          hotel: hotel.name,
+          rating: hotel.rating,
+          color: currentColor,
+          latitude: hotel.latitude,
+          longitude: hotel.longitude,
+        });
+      }
+      
+      // Log color assignment for verification (only once per hotel)
+      if (!isSelected && !isHovered) {
+        console.log('🎨 Marker color debug:', {
+          hotel: hotel.name,
+          rating: hotel.rating,
+          color: currentColor,
+          category: hotel.rating >= 8.5 ? 'high' : hotel.rating >= 7.0 ? 'medium' : 'low',
+        });
+      }
     }
   }, [isSelected, hotel, isHovered]);
 
@@ -61,12 +72,8 @@ export const HotelMarker = React.memo<HotelMarkerProps>(({
   }, [onHover]);
 
   const markerColor = useMemo(() => {
-    if (isSelected) return '#DC2626'; // red-600
-    if (isHovered) return '#EA580C'; // orange-600
-    if (hotel.rating >= 8.5) return '#059669'; // emerald-600
-    if (hotel.rating >= 7.0) return '#0D9488'; // teal-600
-    return '#6B7280'; // gray-500
-  }, [isSelected, isHovered, hotel.rating]);
+    return getHotelMarkerColor(hotel.rating, isSelected, isHovered);
+  }, [hotel.rating, isSelected, isHovered]);
 
   const markerSize = useMemo(() => {
     if (isSelected) return 40;
