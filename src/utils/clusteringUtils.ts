@@ -285,6 +285,7 @@ export function clearClusterCache(): void {
 export function getClusterColor(avgRating: number): string {
   // Re-export from unified color system to maintain backward compatibility
   return getUnifiedClusterColor(avgRating);
+
 }
 
 /**
