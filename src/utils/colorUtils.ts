@@ -7,7 +7,7 @@
  * Adjust these values to change the rating segments across the entire app
  */
 export const RATING_THRESHOLDS = {
-  HIGH: 8.7,    // Excellent hotels
+  HIGH: 8.6,    // Excellent hotels
   MEDIUM: 8.0,  // Good hotels
   // Below 7.0 = Average/Poor hotels
 } as const;

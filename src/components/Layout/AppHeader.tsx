@@ -12,9 +12,10 @@ interface AppHeaderProps {
   title: string;
   subtitle: string;
   stats?: DataStats | null;
+  children?: React.ReactNode;
 }
 
-const AppHeader: React.FC<AppHeaderProps> = ({ title, subtitle, stats }) => {
+const AppHeader: React.FC<AppHeaderProps> = ({ title, subtitle, stats, children }) => {
   return (
     <motion.header
       initial={{ opacity: 0, y: -20 }}
@@ -33,27 +34,37 @@ const AppHeader: React.FC<AppHeaderProps> = ({ title, subtitle, stats }) => {
           </div>
         </div>
 
-        {/* Stats */}
-        {stats && (
-          <div className="hidden md:flex items-center space-x-6 text-sm">
-            <div className="flex items-center space-x-2">
-              <Users className="w-4 h-4 text-blue-600" />
-              <span className="font-medium">{stats.totalHotels}</span>
-              <span className="text-gray-500">hotels</span>
+        {/* Right Side Content */}
+        <div className="flex items-center space-x-4">
+          {/* Stats */}
+          {stats && (
+            <div className="hidden md:flex items-center space-x-6 text-sm">
+              <div className="flex items-center space-x-2">
+                <Users className="w-4 h-4 text-blue-600" />
+                <span className="font-medium">{stats.totalHotels}</span>
+                <span className="text-gray-500">hotels</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Star className="w-4 h-4 text-yellow-500" />
+                <span className="font-medium">{stats.avgRating.toFixed(1)}</span>
+                <span className="text-gray-500">avg rating</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="text-green-600 font-medium">
+                  ${stats.priceRange.min} - ${stats.priceRange.max}
+                </span>
+                <span className="text-gray-500">per night</span>
+              </div>
             </div>
+          )}
+
+          {/* Children (e.g., Filter Button) */}
+          {children && (
             <div className="flex items-center space-x-2">
-              <Star className="w-4 h-4 text-yellow-500" />
-              <span className="font-medium">{stats.avgRating.toFixed(1)}</span>
-              <span className="text-gray-500">avg rating</span>
+              {children}
             </div>
-            <div className="flex items-center space-x-2">
-              <span className="text-green-600 font-medium">
-                ${stats.priceRange.min} - ${stats.priceRange.max}
-              </span>
-              <span className="text-gray-500">per night</span>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </motion.header>
   );

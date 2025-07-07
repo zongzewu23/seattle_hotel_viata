@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import HotelMap from './components/Map/HotelMap';
 import LoadingScreen from './components/UI/LoadingScreen';
@@ -7,8 +7,10 @@ import AppHeader from './components/Layout/AppHeader';
 import HotelInfoBar from './components/Hotel/HotelInfoBar';
 import DebugPanel from './components/Debug/DebugPanel';
 import ClusteringDebug from './components/Debug/ClusteringDebug';
-import type { Hotel } from './types/index';
-import { loadHotelData } from './utils/dataProcessor';
+import FilterPanel from './components/Filter/FilterPanel';
+import FilterButton, { FloatingFilterButton } from './components/Filter/FilterButton';
+import type { Hotel, HotelFilters } from './types/index';
+import { loadHotelData, filterHotels } from './utils/dataProcessor';
 
 // =============================================================================
 // APP CONFIGURATION
@@ -45,7 +47,30 @@ function App() {
     zoom: 12.5,
   });
   const [showClusteringDebug, setShowClusteringDebug] = useState(false);
-  const [enableClustering, setEnableClustering] = useState(true);
+  const [enableClustering] = useState(true);
+
+  // Filter state
+  const [filters, setFilters] = useState<HotelFilters>({});
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+
+  // Apply filters to hotels
+  const filteredHotels = useMemo(() => {
+    if (hotels.length === 0) return [];
+    return filterHotels(hotels, filters);
+  }, [hotels, filters]);
+
+  // Count active filters
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    
+    if (filters.priceRange) count++;
+    if (filters.ratingRange) count++;
+    if (filters.starRating && filters.starRating.length > 0) count++;
+    if (filters.amenities && filters.amenities.length > 0) count += filters.amenities.length;
+    if (filters.searchQuery && filters.searchQuery.trim()) count++;
+    
+    return count;
+  }, [filters]);
 
   // Data loading effect
   useEffect(() => {
@@ -138,6 +163,23 @@ function App() {
     setShowClusteringDebug(prev => !prev);
   }, []);
 
+  // Filter handlers
+  const handleOpenFilterPanel = useCallback(() => {
+    setIsFilterPanelOpen(true);
+  }, []);
+
+  const handleCloseFilterPanel = useCallback(() => {
+    setIsFilterPanelOpen(false);
+  }, []);
+
+  const handleFiltersChange = useCallback((newFilters: HotelFilters) => {
+    setFilters(newFilters);
+    if (DEBUG_MODE) {
+      console.log('Filters changed:', newFilters);
+      console.log('Filtered hotels count:', filterHotels(hotels, newFilters).length);
+    }
+  }, [hotels]);
+
   // Loading state
   if (isLoading) {
     return <LoadingScreen />;
@@ -154,9 +196,18 @@ function App() {
       {/* Header */}
       <AppHeader 
         title={APP_TITLE}
-        subtitle="Discover amazing stays in Seattle"
+        subtitle={`Discover amazing stays in Seattle • ${filteredHotels.length} hotels found`}
         stats={dataStats}
-      />
+      >
+        {/* Filter Button in Header */}
+        <FilterButton
+          onClick={handleOpenFilterPanel}
+          activeFiltersCount={activeFiltersCount}
+          isOpen={isFilterPanelOpen}
+          variant="secondary"
+          size="md"
+        />
+      </AppHeader>
 
       {/* Map Container with Overlay Info Bar */}
       <motion.main
@@ -166,7 +217,7 @@ function App() {
         className={`flex-1 relative ${selectedHotel ? 'has-info-bar' : ''}`}
       >
         <HotelMap
-          hotels={hotels}
+          hotels={filteredHotels}
           selectedHotel={selectedHotel}
           onHotelSelect={handleHotelSelect}
           onHotelHover={handleHotelHover}
@@ -181,11 +232,31 @@ function App() {
           hotel={selectedHotel}
           onClose={handleClearSelection}
         />
+
+        {/* Mobile Floating Filter Button */}
+        <div className="md:hidden">
+          <FloatingFilterButton
+            onClick={handleOpenFilterPanel}
+            activeFiltersCount={activeFiltersCount}
+            isOpen={isFilterPanelOpen}
+            position="bottom-right"
+          />
+        </div>
       </motion.main>
+
+      {/* Filter Panel */}
+      <FilterPanel
+        isOpen={isFilterPanelOpen}
+        onClose={handleCloseFilterPanel}
+        hotels={hotels}
+        filters={filters}
+        onFiltersChange={handleFiltersChange}
+        filteredHotelsCount={filteredHotels.length}
+      />
 
       {/* Debug Panel */}
       <DebugPanel 
-        hotels={hotels}
+        hotels={filteredHotels}
         selectedHotel={selectedHotel}
         hoveredHotel={hoveredHotel}
         debugMode={DEBUG_MODE}
@@ -193,7 +264,7 @@ function App() {
 
       {/* Clustering Debug */}
       <ClusteringDebug
-        hotels={hotels}
+        hotels={filteredHotels}
         viewState={mapViewState}
         enableClustering={enableClustering}
         isVisible={showClusteringDebug}
