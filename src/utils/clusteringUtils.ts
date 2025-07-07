@@ -6,8 +6,8 @@ import { getClusterColor as getUnifiedClusterColor } from './colorUtils';
 // =============================================================================
 
 export const DEFAULT_CLUSTERING_CONFIG: ClusteringConfig = {
-  minZoom: 8,          // Start clustering at zoom level 8
-  maxZoom: 14,         // Stop clustering at zoom level 14
+  minZoom: 8,          // Reserved for future use (currently unused)
+  maxZoom: 14,         // Stop clustering at zoom level 14 (show individuals when zoomed in)
   clusterRadius: 50,   // 50px radius for grouping
   maxClusterSize: 50,  // Max 50 hotels per cluster
   pixelRadius: 40,     // Visual marker radius
@@ -21,7 +21,8 @@ export const DEFAULT_CLUSTERING_CONFIG: ClusteringConfig = {
  * Determines if clustering should be enabled based on zoom level
  */
 export function shouldCluster(zoom: number, config: ClusteringConfig): boolean {
-  return zoom >= config.minZoom && zoom <= config.maxZoom;
+  // Cluster unless zoomed in too much (maxZoom acts as threshold to show individuals)
+  return zoom <= config.maxZoom;
 }
 
 /**
